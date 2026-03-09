@@ -5,10 +5,12 @@ import csv
 from datetime import date, datetime, time
 import io
 import json
-from math import ceil
+from pathlib import Path
+import tempfile
 
 # Type annotations for responses
 from typing import Any, Optional, Tuple, Union
+import uuid
 
 from flask import (
     Response,
@@ -20,6 +22,7 @@ from flask import (
     redirect,
     render_template,
     request,
+    session,
     url_for,
 )
 from flask_login import current_user, login_required
@@ -46,22 +49,63 @@ from app.utils.timezone_utils import (
 )
 
 # Constants
-PER_PAGE = 10  # Number of expenses per page
-SHOW_ALL = -1  # Special value to show all expenses
+DEFAULT_LIST_PAGE_SIZE = 25  # Chunk size for infinite-scroll list
+MAX_LIST_PAGE_SIZE = 100
+IMPORT_REVIEW_SESSION_KEY = "expense_import_review_token"
 
 
-def _get_page_size_from_cookie(cookie_name: str = "expense_page_size", default_size: int = PER_PAGE) -> int:
-    """Get page size from cookie with validation and fallback."""
+def _get_import_review_storage_dir() -> Path:
+    """Return the server-side storage directory for import review drafts."""
+    configured_dir = current_app.config.get("IMPORT_REVIEW_DIR")
+    review_dir = Path(configured_dir) if configured_dir else Path(tempfile.gettempdir()) / "meal-expense-import-reviews"
+    review_dir.mkdir(mode=0o700, parents=True, exist_ok=True)
+    return review_dir
+
+
+def _get_import_review_file_path(token: str) -> Path:
+    """Return the review draft file path for a token."""
+    safe_token = "".join(ch for ch in token if ch.isalnum() or ch in {"-", "_"})
+    return _get_import_review_storage_dir() / f"{safe_token}.json"
+
+
+def _clear_import_review_draft() -> None:
+    """Remove any active import review draft for the current session."""
+    token = session.pop(IMPORT_REVIEW_SESSION_KEY, None)
+    if not token:
+        return
+    draft_path = _get_import_review_file_path(str(token))
     try:
-        cookie_value = request.cookies.get(cookie_name)
-        if cookie_value:
-            page_size = int(cookie_value)
-            # Validate page size is in allowed values
-            if page_size in [10, 25, 50, 100, SHOW_ALL]:
-                return page_size
-    except (ValueError, TypeError):
-        pass
-    return default_size
+        if draft_path.exists():
+            draft_path.unlink()
+    except OSError:
+        current_app.logger.warning("Failed to delete import review draft: %s", draft_path)
+
+
+def _store_import_review_draft(payload: dict[str, Any]) -> str:
+    """Persist an import review draft server-side and store the token in session."""
+    _clear_import_review_draft()
+    token = f"{current_user.id}-{uuid.uuid4().hex}"
+    draft_path = _get_import_review_file_path(token)
+    draft_path.write_text(json.dumps(payload), encoding="utf-8")
+    session[IMPORT_REVIEW_SESSION_KEY] = token
+    return token
+
+
+def _load_import_review_draft() -> dict[str, Any] | None:
+    """Load the active import review draft for the current session."""
+    token = session.get(IMPORT_REVIEW_SESSION_KEY)
+    if not token:
+        return None
+    draft_path = _get_import_review_file_path(str(token))
+    if not draft_path.exists():
+        session.pop(IMPORT_REVIEW_SESSION_KEY, None)
+        return None
+    try:
+        return json.loads(draft_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        current_app.logger.error("Failed to load import review draft from %s", draft_path)
+        session.pop(IMPORT_REVIEW_SESSION_KEY, None)
+        return None
 
 
 def _sort_categories_by_default_order(categories: list[Category]) -> list[Category]:
@@ -109,7 +153,7 @@ def _get_form_choices(
         icon_val: str | None = c.icon
         categories.append((cat_id, cat_name, color_val, icon_val))
     restaurants: list[tuple[int, str]] = [
-        (r.id, r.name) for r in Restaurant.query.filter_by(user_id=user_id).order_by(Restaurant.name).all()
+        (r.id, r.display_name) for r in Restaurant.query.filter_by(user_id=user_id).order_by(Restaurant.name).all()
     ]
     return categories, restaurants
 
@@ -573,6 +617,7 @@ def _populate_expense_form(form: ExpenseForm, expense: Expense) -> None:
     # Set date FIRST before anything else to ensure it's not overwritten
     form.date.data = browser_date  # Browser timezone date, NOT UTC!
     form.time.data = browser_time  # Browser timezone time
+    form.cleared_date.data = expense.cleared_date
 
     # Now set all other fields
     form.amount.data = expense.amount
@@ -733,79 +778,91 @@ def _render_expense_form(
 
 @bp.route("/")
 @login_required
-def list_expenses() -> str:
+def list_expenses() -> str | Response:
     """List all expenses for the current user with optional filtering.
 
-    Returns:
-        Rendered template with paginated expenses and filter options
+    Uses SQL-level pagination and infinite scroll: initial load returns the full
+    page with first chunk; HTMX requests with offset return only the next chunk fragment.
     """
     view_mode = request.args.get("view", "expenses")
     calendar_month = request.args.get("month")
-    # Get pagination parameters with type hints
-    page = request.args.get("page", 1, type=int)
-    # Check for per_page in URL params first, then cookie, then default
-    per_page = request.args.get("per_page", type=int)
-    if per_page is None:
-        per_page = _get_page_size_from_cookie("expense_page_size", PER_PAGE)
+    offset = max(0, request.args.get("offset", 0, type=int))
+    limit = min(
+        max(1, request.args.get("limit", DEFAULT_LIST_PAGE_SIZE, type=int)),
+        MAX_LIST_PAGE_SIZE,
+    )
 
-    # Extract filters from request using the service layer
     filters = expense_services.get_expense_filters(request)
 
-    # Get filtered expenses using the service layer
-    expenses: list[Expense] = []
+    expenses_page: list[Expense] = []
+    total_count = 0
     total_amount: float = 0.0
     avg_price_per_person: float | None = None
     try:
-        expenses, total_amount, avg_price_per_person = expense_services.get_user_expenses(current_user.id, filters)
-        current_app.logger.info(f"Found {len(expenses)} expenses for user {current_user.id}")
+        (
+            expenses_page,
+            total_count,
+            total_amount,
+            avg_price_per_person,
+        ) = expense_services.get_user_expenses_paginated(current_user.id, filters, offset=offset, limit=limit)
+        current_app.logger.info(f"Found {total_count} expenses for user {current_user.id}, page offset={offset}")
     except Exception as e:
         current_app.logger.error(f"Error filtering expenses: {str(e)}")
 
-    # Handle pagination or show all
-    calendar_expenses = expenses
-    total_expenses = len(expenses)
-    if per_page == SHOW_ALL:
-        # Show all expenses without pagination
-        paginated_expenses = expenses
-        total_pages = 1
-        page = 1
-    else:
-        # Calculate pagination with bounds checking
-        total_pages = max(1, ceil(total_expenses / per_page)) if total_expenses else 1
-        page = max(1, min(page, total_pages))  # Ensure page is within bounds
-        start_idx = (page - 1) * per_page
-        end_idx = start_idx + per_page
-        paginated_expenses = expenses[start_idx:end_idx]
+    has_more = (offset + len(expenses_page)) < total_count
+    next_offset = offset + limit
 
-    # Get filter options for the filter form
+    # Chunk-only response for HTMX infinite scroll (append next fragment)
+    is_htmx = request.headers.get("HX-Request") == "true"
+    if is_htmx and offset > 0:
+        return render_template(
+            "expenses/_list_chunk.html",
+            expenses=expenses_page,
+            has_more=has_more,
+            next_offset=next_offset,
+            total_expenses=total_count,
+            total_amount=total_amount,
+            search=filters["search"],
+            meal_type=filters["meal_type"],
+            order_type=filters.get("order_type", ""),
+            category=filters["category"],
+            tags=filters.get("tags", []),
+            start_date=filters["start_date"],
+            end_date=filters["end_date"],
+        )
+
+    # Full page: first chunk + calendar data (limited)
+    calendar_expenses = expense_services.get_calendar_expenses(current_user.id, filters)
+
     filter_options = expense_services.get_filter_options(current_user.id)
-    # Also get main service filter options for dropdowns
     try:
         main_filter_options = expense_services.get_main_filter_options(current_user.id)
         filter_options.update(main_filter_options)
     except Exception as e:
         current_app.logger.error(f"Error getting filter options: {str(e)}")
-
     filter_options["order_types"] = get_order_type_names()
 
-    # Get browser timezone for display
     _, timezone_display = get_browser_timezone_info()
+    receipt_reconciliation_rows, receipt_reconciliation_summary = expense_services.get_receipt_reconciliation(
+        current_user.id
+    )
 
     return render_template(
         "expenses/list.html",
-        expenses=paginated_expenses,
+        expenses=expenses_page,
         calendar_expenses=calendar_expenses,
+        receipt_reconciliation_rows=receipt_reconciliation_rows,
+        receipt_reconciliation_summary=receipt_reconciliation_summary,
         total_amount=total_amount,
         avg_price_per_person=avg_price_per_person,
-        page=page,
-        per_page=per_page,
-        total_pages=total_pages,
-        total_expenses=total_expenses,
+        total_expenses=total_count,
+        has_more=has_more,
+        next_offset=next_offset,
         search=filters["search"],
         meal_type=filters["meal_type"],
         order_type=filters.get("order_type", ""),
         category=filters["category"],
-        tags=filters.get("tags", []),  # List of selected tag names
+        tags=filters.get("tags", []),
         start_date=filters["start_date"],
         end_date=filters["end_date"],
         timezone_display=timezone_display,
@@ -854,6 +911,21 @@ def expense_details(expense_id: int) -> ResponseReturnValue:
     )
 
 
+def _is_safe_redirect_path(url: str | None) -> bool:
+    """Return True if url is a safe internal path for redirect (relative path, no external URLs)."""
+    if not url or not isinstance(url, str):
+        return False
+    url = url.strip()
+    if url.startswith(("http://", "https://", "//")):
+        return False
+    if not url.startswith("/"):
+        return False
+    from urllib.parse import urlparse
+
+    parsed = urlparse(url)
+    return bool(parsed.path and not parsed.netloc)
+
+
 @bp.route("/<int:expense_id>/delete", methods=["POST"])
 @login_required
 @db_transaction(
@@ -867,7 +939,7 @@ def delete_expense(expense_id: int) -> Response:
         expense_id: The ID of the expense to delete
 
     Returns:
-        Redirect to expenses list
+        Redirect to next URL if provided and safe, otherwise expenses list
 
     Raises:
         404: If expense is not found
@@ -880,6 +952,9 @@ def delete_expense(expense_id: int) -> Response:
     if expense.user_id != current_user.id:
         abort(403)
     expense_services.delete_expense(expense)
+    next_url = request.form.get("next")
+    if next_url and _is_safe_redirect_path(next_url):
+        return redirect(next_url)  # type: ignore[return-value]
     return redirect(url_for("expenses.list_expenses"))  # type: ignore[return-value]
 
 
@@ -1020,6 +1095,70 @@ def export_expenses() -> ResponseReturnValue:
 def import_expenses() -> ResponseReturnValue:
     """Handle expense import from file upload."""
     form = ExpenseImportForm()
+    restaurants = sorted(
+        Restaurant.query.filter_by(user_id=current_user.id).all(),
+        key=lambda restaurant: ((restaurant.display_name or restaurant.name or "").lower(), restaurant.id),
+    )
+
+    if request.method == "GET":
+        if request.args.get("new") == "1":
+            _clear_import_review_draft()
+            return render_template("expenses/import.html", form=form)
+
+        draft = _load_import_review_draft()
+        if draft is not None:
+            return render_template(
+                "expenses/import_review.html",
+                form=form,
+                review_rows=draft.get("review_rows", []),
+                review_summary={
+                    "total_rows": draft.get("total_rows", 0),
+                    "importable_rows": draft.get("importable_rows", 0),
+                    "duplicate_rows": draft.get("duplicate_rows", 0),
+                },
+                all_restaurants=restaurants,
+            )
+
+    if request.method == "POST" and request.form.get("review_action") == "apply":
+        draft = _load_import_review_draft()
+        if draft is None:
+            flash("Import review draft expired. Please upload the file again.", "warning")
+            return redirect(url_for("expenses.import_expenses"))  # type: ignore[return-value]
+
+        result = expense_services.apply_expense_import_review(
+            draft.get("review_rows", []), request.form.to_dict(), current_user.id
+        )
+        if result.get("success"):
+            _clear_import_review_draft()
+            imported_count = int(result.get("imported_count", 0) or 0)
+            updated_count = int(result.get("updated_count", 0) or 0)
+            result_parts = []
+            if imported_count:
+                result_parts.append(f"imported {imported_count} expense{'s' if imported_count != 1 else ''}")
+            if updated_count:
+                result_parts.append(f"updated {updated_count} expense{'s' if updated_count != 1 else ''}")
+            flash(
+                (result_parts and "Successfully " + " and ".join(result_parts) + ".") or "Import review applied.",
+                "success",
+            )
+            skipped_count = int(result.get("skipped_count", 0) or 0)
+            if skipped_count:
+                flash(f"Skipped {skipped_count} row{'s' if skipped_count != 1 else ''}.", "warning")
+            return redirect(url_for("expenses.list_expenses"))  # type: ignore[return-value]
+
+        flash(result.get("errors", ["Import review failed."])[0], "danger")
+        return render_template(
+            "expenses/import_review.html",
+            form=form,
+            review_rows=draft.get("review_rows", []),
+            review_summary={
+                "total_rows": draft.get("total_rows", 0),
+                "importable_rows": draft.get("importable_rows", 0),
+                "duplicate_rows": draft.get("duplicate_rows", 0),
+            },
+            all_restaurants=restaurants,
+            errors=result.get("errors", []),
+        )
 
     if request.method == "POST" and form.validate_on_submit():
         file = form.file.data
@@ -1027,60 +1166,30 @@ def import_expenses() -> ResponseReturnValue:
 
         if file and file.filename:
             try:
-                current_app.logger.info("Processing expense import...")
-                success, result_data = expense_services.import_expenses_from_csv(file, current_user.id)
-                current_app.logger.info(f"Import result: success={success}, data={result_data}")
+                current_app.logger.info("Building expense import review...")
+                success, result_data = expense_services.build_expense_import_review(file, current_user.id)
+                current_app.logger.info("Import review result: success=%s", success)
 
-                # Handle the structured result data to show appropriate toasts
                 if success:
-                    # Show success message for imported expenses
-                    if result_data.get("success_count", 0) > 0:
-                        flash(
-                            f"Successfully imported {result_data['success_count']} expenses.",
-                            "success",
-                        )
+                    _store_import_review_draft(result_data)
+                    return redirect(url_for("expenses.import_expenses"))  # type: ignore[return-value]
 
-                    # Show warning toast for skipped items (duplicates and restaurant warnings)
-                    if result_data.get("has_warnings", False):
-                        warning_count = result_data.get("skipped_count", 0)
-                        flash(
-                            f"{warning_count} items were skipped (duplicates or restaurant warnings).",
-                            "warning",
-                        )
-
-                    # If there are warnings but success, show import summary before redirecting
-                    if result_data.get("has_warnings", False) and result_data.get("info_messages"):
-                        return render_template(
-                            "expenses/import.html",
-                            form=form,
-                            import_summary=result_data,
-                            warnings=result_data.get("info_messages", []),
-                        )
-
-                    return redirect(url_for("expenses.list_expenses"))  # type: ignore[return-value]  # type: ignore[return-value]  # type: ignore[return-value]
-                else:
-                    # Show error toast with summary
-                    error_message = result_data.get("message", "Import failed")
-                    flash(error_message, "danger")
-
-                    # Pass detailed errors to template for display
-                    detailed_errors = result_data.get("error_details", [])
-                    current_app.logger.error(f"Import errors: {detailed_errors}")
-
-                    # Render template with error details
-                    return render_template(
-                        "expenses/import.html",
-                        form=form,
-                        errors=detailed_errors,
-                        import_summary=result_data,
-                    )
+                error_message = result_data.get("message", "Import failed")
+                flash(error_message, "danger")
+                return render_template(
+                    "expenses/import.html",
+                    form=form,
+                    errors=result_data.get("errors", []),
+                )
 
             except ValueError as e:
                 current_app.logger.error("ValueError during import: %s", str(e))
+                db.session.rollback()
                 flash(str(e), "danger")
                 return render_template("expenses/import.html", form=form, errors=[str(e)])
             except Exception as e:
                 current_app.logger.error("Unexpected error during import: %s", str(e))
+                db.session.rollback()
                 flash("An unexpected error occurred during import", "danger")
                 return render_template(
                     "expenses/import.html",

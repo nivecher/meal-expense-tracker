@@ -207,6 +207,7 @@ coverage.xml
 *.sqlite3
 *.sqlite
 *.sql
+backups/
 
 # OS generated files
 .DS_Store
@@ -250,3 +251,6 @@ tmp/*
 .VSCodeCounter/
 
 response.json
+
+# Snyk Security Extension - AI Rules (auto-generated)
+.windsurf/rules/snyk_rules.md

@@ -408,41 +408,71 @@ jobs:
         id: run_migrations
         run: |
           FUNCTION_NAME="${{ steps.lambda_info.outputs.function_name }}"
-          RESPONSE_FILE="$(mktemp)"
-          META_FILE="$(mktemp)"
+          MAX_ATTEMPTS=5
+          LAST_ERROR=""
+          LAST_RESPONSE_FILE=""
+          LAST_META_FILE=""
 
-          aws lambda invoke \
-            --function-name "${FUNCTION_NAME}" \
-            --invocation-type RequestResponse \
-            --cli-binary-format raw-in-base64-out \
-            --cli-read-timeout 300 \
-            --payload '{"admin_operation":"run_migrations","confirm":true}' \
-            "${RESPONSE_FILE}" > "${META_FILE}"
+          for attempt in $(seq 1 ${MAX_ATTEMPTS}); do
+            RESPONSE_FILE="$(mktemp)"
+            META_FILE="$(mktemp)"
 
-          INVOKE_STATUS="$(jq -r '.StatusCode // 0' "${META_FILE}")"
-          if [ "${INVOKE_STATUS}" != "200" ]; then
-            echo "❌ Lambda invoke failed with StatusCode=${INVOKE_STATUS}"
-            cat "${META_FILE}"
-            exit 1
+            echo "Running migrations (attempt ${attempt}/${MAX_ATTEMPTS})..."
+
+            if ! aws lambda invoke \
+              --function-name "${FUNCTION_NAME}" \
+              --region "${AWS_REGION}" \
+              --invocation-type RequestResponse \
+              --cli-binary-format raw-in-base64-out \
+              --cli-connect-timeout 30 \
+              --cli-read-timeout 900 \
+              --payload '{"admin_operation":"run_migrations","confirm":true}' \
+              "${RESPONSE_FILE}" > "${META_FILE}"; then
+              LAST_ERROR="Lambda invoke command failed"
+            else
+              INVOKE_STATUS="$(jq -r '.StatusCode // 0' "${META_FILE}")"
+              FUNCTION_ERROR="$(jq -r '.FunctionError // empty' "${META_FILE}")"
+
+              if [ "${INVOKE_STATUS}" != "200" ]; then
+                LAST_ERROR="Lambda invoke failed with StatusCode=${INVOKE_STATUS}"
+              elif [ -n "${FUNCTION_ERROR}" ]; then
+                LAST_ERROR="Lambda invoke returned FunctionError=${FUNCTION_ERROR}"
+              else
+                APP_STATUS="$(jq -r '.statusCode // 0' "${RESPONSE_FILE}")"
+                APP_SUCCESS="$(jq -r '(.body | if type == "string" then (try fromjson catch {}) else . end | .success) // false' "${RESPONSE_FILE}")"
+                APP_MESSAGE="$(jq -r '(.body | if type == "string" then (try fromjson catch {}) else . end | .message) // .errorMessage // "Unknown migration response"' "${RESPONSE_FILE}")"
+
+                if [ "${APP_STATUS}" = "200" ] && [ "${APP_SUCCESS}" = "true" ]; then
+                  echo "✅ ${APP_MESSAGE}"
+                  exit 0
+                fi
+
+                LAST_ERROR="Migration operation failed: statusCode=${APP_STATUS}, message=${APP_MESSAGE}"
+              fi
+            fi
+
+            echo "⚠️  ${LAST_ERROR}"
+            LAST_RESPONSE_FILE="${RESPONSE_FILE}"
+            LAST_META_FILE="${META_FILE}"
+
+            if [ "${attempt}" -lt "${MAX_ATTEMPTS}" ]; then
+              SLEEP_SECONDS=$((attempt * 10))
+              echo "Retrying in ${SLEEP_SECONDS}s..."
+              sleep "${SLEEP_SECONDS}"
+            fi
+          done
+
+          echo "❌ Database migrations failed after ${MAX_ATTEMPTS} attempts"
+          echo "Last error: ${LAST_ERROR}"
+          if [ -f "${LAST_META_FILE}" ]; then
+            echo "--- Last Lambda invoke metadata ---"
+            cat "${LAST_META_FILE}"
           fi
-
-          APP_STATUS="$(jq -r '.statusCode // 0' "${RESPONSE_FILE}")"
-          if [ "${APP_STATUS}" != "200" ]; then
-            echo "❌ Migration admin operation returned statusCode=${APP_STATUS}"
-            cat "${RESPONSE_FILE}"
-            exit 1
+          if [ -f "${LAST_RESPONSE_FILE}" ]; then
+            echo "--- Last Lambda response payload ---"
+            cat "${LAST_RESPONSE_FILE}"
           fi
-
-          APP_SUCCESS="$(jq -r '.body | fromjson | .success // false' "${RESPONSE_FILE}")"
-          if [ "${APP_SUCCESS}" != "true" ]; then
-            APP_MESSAGE="$(jq -r '.body | fromjson | .message // \"Unknown migration error\"' "${RESPONSE_FILE}")"
-            echo "❌ Migration failed: ${APP_MESSAGE}"
-            cat "${RESPONSE_FILE}"
-            exit 1
-          fi
-
-          APP_MESSAGE="$(jq -r '.body | fromjson | .message // \"Migrations completed\"' "${RESPONSE_FILE}")"
-          echo "✅ ${APP_MESSAGE}"
+          exit 1
 
       - name: Sync static files to S3
         run: |

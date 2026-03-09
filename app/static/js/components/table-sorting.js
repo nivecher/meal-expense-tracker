@@ -97,12 +97,16 @@ function getMerchantCellValue(row, columnIndex) {
 
   const { sortValue } = cell.dataset;
   if (sortValue !== null && sortValue !== undefined) {
-    if (columnIndex === 3) {
+    if (columnIndex === 6 || columnIndex === 7) {
       return parseInt(sortValue, 10) || 0;
     }
 
-    if (columnIndex === 2) {
-      if (sortValue === 'Uncategorized') {
+    if (columnIndex === 8) {
+      return parseFloat(sortValue) || 0;
+    }
+
+    if (columnIndex >= 1 && columnIndex <= 5) {
+      if (sortValue === 'Unspecified' || sortValue === 'Uncategorized') {
         return 'zzz';
       }
       return sortValue.toLowerCase();
@@ -244,12 +248,12 @@ function createAlphaDividerRow(alphaLabel, columnCount) {
   return dividerRow;
 }
 
-function createMerchantCategoryDividerRow(categoryLabel, columnCount) {
+function createMerchantGroupDividerRow(groupLabel, columnCount) {
   const dividerRow = document.createElement('tr');
   dividerRow.className = 'table-city-divider';
   dividerRow.dataset.dividerRow = 'true';
-  dividerRow.dataset.merchantCategoryLabel = categoryLabel;
-  dividerRow.dataset.merchantCategoryCollapsed = 'false';
+  dividerRow.dataset.merchantGroupLabel = groupLabel;
+  dividerRow.dataset.merchantGroupCollapsed = 'false';
   const cell = document.createElement('td');
   cell.colSpan = columnCount;
   const content = document.createElement('div');
@@ -259,7 +263,7 @@ function createMerchantCategoryDividerRow(categoryLabel, columnCount) {
   const toggleButton = document.createElement('button');
   toggleButton.type = 'button';
   toggleButton.className = 'city-toggle';
-  toggleButton.dataset.merchantCategoryToggle = categoryLabel;
+  toggleButton.dataset.merchantGroupToggle = groupLabel;
   toggleButton.setAttribute('aria-expanded', 'true');
   const toggleIcon = document.createElement('i');
   toggleIcon.className = 'fas fa-chevron-down';
@@ -267,7 +271,7 @@ function createMerchantCategoryDividerRow(categoryLabel, columnCount) {
   toggleButton.appendChild(toggleIcon);
   const label = document.createElement('span');
   label.className = 'city-divider-label text-muted text-uppercase';
-  label.textContent = categoryLabel;
+  label.textContent = groupLabel;
   left.append(toggleButton, label);
   content.appendChild(left);
   cell.appendChild(content);
@@ -283,14 +287,23 @@ function getRestaurantAlphaGroup(value) {
 }
 
 function getRestaurantLocationGroup(row) {
-  return row.dataset.restaurantCity || 'No location';
+  return row.dataset.restaurantCityGroup || 'No location';
 }
 
-function getMerchantCategoryGroup(row) {
-  const rawCategory = row.dataset.merchantCategory || '';
-  if (!rawCategory) return 'Uncategorized';
-  if (rawCategory === 'Uncategorized') return rawCategory;
-  return rawCategory.replace(/_/g, ' ').replace(/\b\w/g, (letter) => letter.toUpperCase());
+function getMerchantGroup(row, groupBy) {
+  if (groupBy === 'service_level') {
+    return row.dataset.merchantServiceLevelGroup || 'Unspecified';
+  }
+  if (groupBy === 'cuisine') {
+    return row.dataset.merchantCuisineGroup || 'Unspecified';
+  }
+  if (groupBy === 'menu_focus') {
+    return row.dataset.merchantMenuFocusGroup || 'Unspecified';
+  }
+  if (groupBy === 'format') {
+    return row.dataset.merchantFormatGroup || 'Unspecified';
+  }
+  return 'Unspecified';
 }
 
 function rebuildRestaurantTableBody(tbody, rows, columnCount, groupBy) {
@@ -342,7 +355,7 @@ function rebuildMerchantTableBody(tbody, rows, columnCount, groupBy) {
   if (!groupBy) {
     rows.forEach((row) => {
       delete row.dataset.merchantAlphaGroup;
-      delete row.dataset.merchantCategoryGroup;
+      delete row.dataset.merchantGroupKey;
       tbody.appendChild(row);
     });
     return;
@@ -355,24 +368,24 @@ function rebuildMerchantTableBody(tbody, rows, columnCount, groupBy) {
       const [, nameCell] = row.cells;
       const nameValue = nameCell?.dataset.sortValue || nameCell?.textContent || '';
       groupLabel = getRestaurantAlphaGroup(nameValue);
-    } else if (groupBy === 'category') {
-      groupLabel = getMerchantCategoryGroup(row);
+    } else {
+      groupLabel = getMerchantGroup(row, groupBy);
     }
 
     if (groupLabel && groupLabel !== currentGroup) {
       currentGroup = groupLabel;
       const dividerRow =
-        groupBy === 'category'
-          ? createMerchantCategoryDividerRow(groupLabel, columnCount)
+        groupBy !== 'alpha'
+          ? createMerchantGroupDividerRow(groupLabel, columnCount)
           : createAlphaDividerRow(groupLabel, columnCount);
       tbody.appendChild(dividerRow);
     }
 
     if (groupBy === 'alpha') {
       row.dataset.merchantAlphaGroup = groupLabel;
-      delete row.dataset.merchantCategoryGroup;
-    } else if (groupBy === 'category') {
-      row.dataset.merchantCategoryGroup = groupLabel;
+      delete row.dataset.merchantGroupKey;
+    } else {
+      row.dataset.merchantGroupKey = groupLabel;
       delete row.dataset.merchantAlphaGroup;
     }
 
@@ -499,8 +512,8 @@ function sortMerchantTable(columnIndex, ascending) {
       if (aName !== bName) {
         return ascending ? compareValues(aName, bName) : compareValues(bName, aName);
       }
-      const aCount = getMerchantCellValue(a, 3);
-      const bCount = getMerchantCellValue(b, 3);
+      const aCount = getMerchantCellValue(a, 6);
+      const bCount = getMerchantCellValue(b, 6);
       return ascending ? compareValues(aCount, bCount) : compareValues(bCount, aCount);
     }
 
@@ -512,7 +525,13 @@ function sortMerchantTable(columnIndex, ascending) {
   if (columnIndex === 1) {
     groupBy = 'alpha';
   } else if (columnIndex === 2) {
-    groupBy = 'category';
+    groupBy = 'service_level';
+  } else if (columnIndex === 3) {
+    groupBy = 'cuisine';
+  } else if (columnIndex === 4) {
+    groupBy = 'menu_focus';
+  } else if (columnIndex === 5) {
+    groupBy = 'format';
   }
   rebuildMerchantTableBody(tbody, rows, columnCount, groupBy);
 }

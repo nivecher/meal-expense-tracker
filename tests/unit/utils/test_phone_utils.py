@@ -1,8 +1,6 @@
 """Tests for phone normalization utilities."""
 
-import pytest
-
-from app.utils.phone_utils import normalize_phone_for_comparison
+from app.utils.phone_utils import normalize_phone_for_comparison, normalize_phone_for_storage
 
 
 class TestNormalizePhoneForComparison:
@@ -27,3 +25,21 @@ class TestNormalizePhoneForComparison:
         assert normalize_phone_for_comparison("") == ""
         assert normalize_phone_for_comparison("   ") == ""
         assert normalize_phone_for_comparison(None) == ""
+
+
+class TestNormalizePhoneForStorage:
+    """Tests for normalize_phone_for_storage."""
+
+    def test_us_ten_digit_number_gets_default_country_code(self) -> None:
+        assert normalize_phone_for_storage("3125219788") == "+13125219788"
+
+    def test_formatted_us_number_gets_default_country_code(self) -> None:
+        assert normalize_phone_for_storage("(312) 521-9788") == "+13125219788"
+
+    def test_existing_e164_is_preserved(self) -> None:
+        assert normalize_phone_for_storage("+1 (312) 521-9788") == "+13125219788"
+
+    def test_empty_returns_none(self) -> None:
+        assert normalize_phone_for_storage("") is None
+        assert normalize_phone_for_storage("   ") is None
+        assert normalize_phone_for_storage(None) is None

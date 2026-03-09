@@ -353,6 +353,69 @@
   font-size: 0.8rem;
 }
 
+.selected-result-panel {
+  margin-bottom: 0.75rem;
+}
+
+.selected-result-shell {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.9rem;
+  align-items: center;
+  padding: 0.9rem 1rem;
+  border: 1px solid #bad0ea;
+  border-radius: 14px;
+  background:
+    radial-gradient(circle at top right, rgb(13 110 253 / 10%), transparent 34%),
+    linear-gradient(180deg, #fff 0%, #f6faff 100%);
+  box-shadow: 0 14px 32px rgb(16 37 63 / 10%);
+}
+
+.selected-result-kicker {
+  margin-bottom: 0.3rem;
+  color: #31567d;
+  font-size: 0.73rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.selected-result-title {
+  color: #10253f;
+}
+
+.selected-result-address {
+  color: #5d738c;
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
+
+.selected-result-distance {
+  padding: 0.35rem 0.55rem;
+  border: 1px solid #d2e0ef;
+  border-radius: 999px;
+  background: #fff;
+  color: #31567d;
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+.selected-result-badges,
+.selected-result-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  align-items: center;
+}
+
+.selected-result-badges {
+  margin-top: 0.75rem;
+}
+
+.selected-result-actions {
+  justify-content: flex-end;
+}
+
 .legend-item {
   display: inline-flex;
   align-items: center;
@@ -392,6 +455,14 @@
 .discovery-result-card.border-primary {
   border-color: #0d6efd !important;
   box-shadow: 0 0 0 0.2rem rgb(13 110 253 / 16%);
+}
+
+.discovery-result-card.is-selected {
+  border-color: #0d6efd;
+  background:
+    linear-gradient(90deg, rgb(13 110 253 / 8%), transparent 18%),
+    #fff;
+  box-shadow: 0 16px 28px rgb(13 110 253 / 12%);
 }
 
 .discovery-result-card.ownership-mine {
@@ -510,6 +581,14 @@
   .discovery-result-card {
     grid-template-columns: auto 48px minmax(0, 1fr);
     gap: 0.5rem;
+  }
+
+  .selected-result-shell {
+    grid-template-columns: 1fr;
+  }
+
+  .selected-result-actions {
+    justify-content: flex-start;
   }
 
   .result-media {

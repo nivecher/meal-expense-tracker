@@ -1,103 +1,336 @@
-{% extends "base.html" %} {% block title %}Merchants - Meal Expense Tracker{% endblock %} {% block main_container_class
-%}container-fluid{% endblock %} {% block styles %}
+{% extends "base.html" %} {% from 'macros/badge_helpers.html' import cuisine_badge, service_level_badge %} {% block
+title %}Merchants - Meal Expense Tracker{% endblock %} {% block main_container_class %}container-fluid{% endblock %} {%
+block styles %}
 <link href="{{ url_for('static', filename='css/pages/restaurant-list.css') }}" rel="stylesheet" />
-{% endblock styles %} {% block content %} {% set view_preference = request.cookies.get('merchant_view_preference',
-'card') %}
+<link href="{{ url_for('static', filename='css/pages/merchant-list.css') }}" rel="stylesheet" />
+{% endblock styles %} {% block section_header %}
+<div class="section-title">
+    <i class="fas fa-building text-primary"></i>
+    <h1>Merchants</h1>
+</div>
+{% endblock %} {% block content %} {% set view_preference = request.cookies.get('merchant_view_preference', 'card') %}
+{% set active_filters_count = (1 if filters.category else 0) + (1 if filters.service_level else 0) + (1 if
+filters.cuisine else 0) + (1 if filters.menu_focus else 0) + (1 if filters.is_chain else 0) + (1 if
+filters.has_description else 0) + (1 if filters.restaurant_status else 0) %}
+
+<ul class="nav nav-tabs mb-3" id="merchantTabs" role="tablist">
+    <li class="nav-item" role="presentation">
+        <a class="nav-link active" href="{{ url_for('merchants.list_merchants') }}">
+            <i class="fas fa-list me-1"></i>List
+        </a>
+    </li>
+    <li class="nav-item" role="presentation">
+        <a class="nav-link" href="{{ url_for('merchants.review_restaurant_associations') }}">
+            <i class="fas fa-link me-1"></i>Associations
+        </a>
+    </li>
+    <li class="nav-item" role="presentation">
+        <a class="nav-link" href="{{ url_for('loyalty.list_rewards_programs') }}">
+            <i class="fas fa-award me-1"></i>Loyalty
+        </a>
+    </li>
+</ul>
 
 <div class="px-0 pt-2">
-    <div class="d-flex flex-wrap justify-content-between align-items-center mb-3">
-        <div class="activity-title">
-            <i class="fas fa-building text-primary"></i>
-            <span class="fw-semibold">Merchant Directory</span>
-            <span class="text-muted small ms-2"
-                >({{ stats.total_merchants }} merchants, {{ stats.total_restaurants }} restaurants)</span
-            >
-        </div>
-        <a href="{{ url_for('merchants.new_merchant') }}" class="btn btn-primary btn-sm">
-            <i class="fas fa-plus me-1"></i>Add Merchant
-        </a>
-    </div>
-
-    <div class="card mb-3">
-        <div class="card-body py-2">
-            <form method="get" class="row g-2 align-items-center">
-                <div class="col-auto">
-                    <div class="input-group input-group-sm">
-                        <span class="input-group-text bg-light"><i class="fas fa-search"></i></span>
-                        <input
-                            type="text"
-                            name="q"
-                            class="form-control"
-                            placeholder="Search merchants..."
-                            value="{{ filters.search }}" />
+    <div class="card mb-3 activity-panel">
+        <div class="card-header bg-white">
+            <div class="activity-header activity-header-stacked">
+                <div class="activity-header-row activity-header-row-1">
+                    <div class="activity-title">
+                        <i class="fas fa-building text-primary"></i>
+                        <span class="fw-semibold">Merchant Directory</span>
+                        <span class="text-muted small ms-2">
+                            ({{ stats.total_merchants }} merchants, {{ stats.total_restaurants }} restaurants, {{
+                            stats.total_expenses|default(0) }} expenses, {{
+                            stats.total_amount|default(0)|format_currency_usd }})
+                        </span>
                     </div>
-                </div>
-                <div class="col-auto">
-                    <select name="category" class="form-select form-select-sm">
-                        <option value="">All Categories</option>
-                        {% for cat in categories %}
-                        <option
-                            value="{{ cat }}"
+                    <div class="btn-group btn-group-sm view-toggle-in-activity" role="group" aria-label="View Toggle">
+                        <input
+                            type="radio"
+                            class="btn-check"
+                            name="view-type"
+                            id="card-view"
+                            autocomplete="off"
                             {%
                             if
-                            filters.category
-                            and
-                            (filters.category
+                            view_preference
+                            not
                             in
-                            [cat])
-                            %}selected{%
+                            ['table']
+                            %}checked{%
                             endif
-                            %}>
-                            {{ cat|replace('_', ' ')|title }}
-                        </option>
-                        {% endfor %}
-                    </select>
+                            %} />
+                        <label class="btn btn-outline-primary view-toggle-btn" for="card-view">
+                            <i class="fas fa-th-large"></i>
+                            <span class="d-none d-sm-inline ms-1">Cards</span>
+                        </label>
+                        <input
+                            type="radio"
+                            class="btn-check"
+                            name="view-type"
+                            id="table-view"
+                            autocomplete="off"
+                            {%
+                            if
+                            view_preference
+                            in
+                            ['table']
+                            %}checked{%
+                            endif
+                            %} />
+                        <label class="btn btn-outline-primary view-toggle-btn" for="table-view">
+                            <i class="fas fa-table"></i>
+                            <span class="d-none d-sm-inline ms-1">Table</span>
+                        </label>
+                    </div>
                 </div>
-                <div class="col-auto">
-                    <button type="submit" class="btn btn-sm btn-outline-primary">Filter</button>
-                    <a href="{{ url_for('merchants.list_merchants') }}" class="btn btn-sm btn-outline-secondary"
-                        >Clear</a
-                    >
+                <div class="activity-header-row activity-header-row-2">
+                    <form id="merchant-search-form" method="get" class="merchant-search-form">
+                        <input type="hidden" name="sort" value="{{ filters.sort }}" />
+                        <input type="hidden" name="order" value="{{ filters.order }}" />
+                        {% if filters.category %}<input
+                            type="hidden"
+                            name="category"
+                            value="{{ filters.category }}" />{% endif %} {% if filters.service_level %}<input
+                            type="hidden"
+                            name="service_level"
+                            value="{{ filters.service_level }}" />{% endif %} {% if filters.cuisine %}<input
+                            type="hidden"
+                            name="cuisine"
+                            value="{{ filters.cuisine }}" />{% endif %} {% if filters.menu_focus %}<input
+                            type="hidden"
+                            name="menu_focus"
+                            value="{{ filters.menu_focus }}" />{% endif %} {% if filters.is_chain %}<input
+                            type="hidden"
+                            name="is_chain"
+                            value="{{ filters.is_chain }}" />{% endif %} {% if filters.has_description %}<input
+                            type="hidden"
+                            name="has_description"
+                            value="{{ filters.has_description }}" />{% endif %} {% if filters.restaurant_status %}<input
+                            type="hidden"
+                            name="restaurant_status"
+                            value="{{ filters.restaurant_status }}" />{% endif %}
+                        <div class="input-group input-group-sm">
+                            <span class="input-group-text bg-light text-muted"><i class="fas fa-search"></i></span>
+                            <input
+                                type="text"
+                                id="merchant-search-input"
+                                name="q"
+                                class="form-control"
+                                placeholder="Search merchants..."
+                                value="{{ filters.search }}" />
+                            <button
+                                type="button"
+                                id="merchant-search-clear"
+                                class="btn btn-outline-secondary{% if not filters.search %} d-none{% endif %}"
+                                aria-label="Clear merchant search">
+                                <i class="fas fa-times"></i>
+                            </button>
+                        </div>
+                    </form>
+                    <div class="d-flex align-items-center gap-2" id="merchant-filter-status">
+                        <span
+                            id="merchant-filter-status-count"
+                            class="badge bg-primary{% if not active_filters_count %} d-none{% endif %}">
+                            {{ active_filters_count }}
+                        </span>
+                        <span
+                            id="merchant-filter-status-text"
+                            class="text-muted small{% if not active_filters_count %} d-none{% endif %}">
+                            Filters active
+                        </span>
+                    </div>
+                    <div class="activity-actions activity-actions-icons ms-auto d-flex gap-2">
+                        <button
+                            id="merchant-filter-button"
+                            class="btn btn-sm btn-icon-only {% if active_filters_count %}btn-primary{% else %}btn-outline-secondary{% endif %}"
+                            type="button"
+                            data-bs-toggle="modal"
+                            data-bs-target="#merchantFilterModal"
+                            title="{% if active_filters_count %}{{ active_filters_count }} filters active{% else %}Filters{% endif %}">
+                            <i class="fas fa-filter"></i>
+                            <span
+                                id="merchant-filter-count"
+                                class="badge rounded-pill activity-btn-badge bg-white text-primary{% if not active_filters_count %} d-none{% endif %}">
+                                {{ active_filters_count }}
+                            </span>
+                        </button>
+                        <a
+                            class="btn btn-sm btn-outline-secondary btn-icon-only"
+                            href="{{ url_for('merchants.import_merchants') }}"
+                            data-bs-toggle="tooltip"
+                            title="Import merchants">
+                            <i class="fas fa-file-import"></i>
+                        </a>
+                        <div class="dropdown">
+                            <button
+                                class="btn btn-sm btn-outline-secondary btn-icon-only dropdown-toggle"
+                                type="button"
+                                id="merchantExportDropdown"
+                                data-bs-toggle="dropdown"
+                                aria-expanded="false"
+                                title="Export all merchants">
+                                <i class="fas fa-download"></i>
+                            </button>
+                            <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="merchantExportDropdown">
+                                <li>
+                                    <a
+                                        class="dropdown-item"
+                                        href="{{ url_for('merchants.export_merchants', format='csv') }}">
+                                        <i class="fas fa-file-csv me-2"></i>Export to CSV
+                                    </a>
+                                </li>
+                                <li>
+                                    <a
+                                        class="dropdown-item"
+                                        href="{{ url_for('merchants.export_merchants', format='json') }}">
+                                        <i class="fas fa-file-code me-2"></i>Export to JSON
+                                    </a>
+                                </li>
+                            </ul>
+                        </div>
+                        <a href="{{ url_for('restaurants.add_restaurant') }}" class="btn btn-sm btn-outline-secondary">
+                            <i class="fas fa-utensils me-1"></i>Add Restaurant
+                        </a>
+                        <a
+                            href="{{ url_for('merchants.review_restaurant_associations') }}"
+                            class="btn btn-sm btn-outline-secondary">
+                            <i class="fas fa-link me-1"></i>Review Associations
+                        </a>
+                        <a
+                            href="{{ url_for('loyalty.list_rewards_programs') }}"
+                            class="btn btn-sm btn-outline-secondary">
+                            <i class="fas fa-award me-1"></i>Loyalty
+                        </a>
+                        <a href="{{ url_for('merchants.new_merchant') }}" class="btn btn-sm btn-primary">
+                            <i class="fas fa-plus me-1"></i>Add Merchant
+                        </a>
+                    </div>
                 </div>
-            </form>
+            </div>
         </div>
-    </div>
-
-    <div class="d-flex justify-content-between align-items-center mb-3">
-        <div class="btn-group btn-group-sm" role="group" aria-label="View Toggle">
-            <input
-                type="radio"
-                class="btn-check"
-                name="view-type"
-                id="card-view"
-                autocomplete="off"
-                {%
-                if
-                view_preference
-                not
-                in
-                ['table']
-                %}
-                checked{%
-                endif
-                %} />
-            <label class="btn btn-outline-primary" for="card-view"> <i class="fas fa-th-large"></i> Cards </label>
-            <input
-                type="radio"
-                class="btn-check"
-                name="view-type"
-                id="table-view"
-                autocomplete="off"
-                {%
-                if
-                view_preference
-                in
-                ['table']
-                %}
-                checked{%
-                endif
-                %} />
-            <label class="btn btn-outline-primary" for="table-view"> <i class="fas fa-table"></i> Table </label>
+        <div class="card-body py-3">
+            <div class="d-flex flex-wrap align-items-center gap-2 mb-3">
+                <span class="badge bg-light text-dark border">{{ stats.total_merchants }} merchants</span>
+                <span class="badge bg-light text-dark border">{{ stats.total_restaurants }} linked restaurants</span>
+                <span class="badge bg-light text-dark border">{{ stats.total_expenses|default(0) }} expenses</span>
+                <span class="badge bg-light text-dark border"
+                    >{{ stats.total_amount|default(0)|format_currency_usd }} total spend</span
+                >
+                {% if active_filters_count %}
+                <span class="badge bg-primary-subtle text-primary border border-primary-subtle">
+                    <i class="fas fa-filter me-1"></i>{{ active_filters_count }} filter{{ 's' if active_filters_count !=
+                    1 else '' }} active
+                </span>
+                {% endif %}
+                <span
+                    class="badge {% if association_summary.merchants_without_restaurants %}bg-warning text-dark{% else %}bg-success-subtle text-success border border-success-subtle{% endif %}">
+                    {{ association_summary.merchants_without_restaurants }} merchant{{ 's' if
+                    association_summary.merchants_without_restaurants != 1 else '' }} without restaurants
+                </span>
+                <span
+                    class="badge {% if association_summary.total_unlinked_restaurants %}bg-warning text-dark{% else %}bg-success-subtle text-success border border-success-subtle{% endif %}">
+                    {{ association_summary.total_unlinked_restaurants }} unlinked restaurant{{ 's' if
+                    association_summary.total_unlinked_restaurants != 1 else '' }}
+                </span>
+                <span class="badge bg-info text-dark">
+                    {{ association_summary.suggested_unlinked_restaurants }} suggestion{{ 's' if
+                    association_summary.suggested_unlinked_restaurants != 1 else '' }} ready
+                </span>
+            </div>
+            {% if filters.search or active_filters_count %}
+            <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+                <div class="d-flex flex-wrap align-items-center gap-2">
+                    {% if filters.search %}
+                    <span class="badge bg-primary-subtle text-primary border border-primary-subtle">
+                        Search: {{ filters.search }}
+                    </span>
+                    {% endif %} {% if filters.category %}
+                    <span class="badge bg-light text-dark border">
+                        Format: {{ merchant_format_labels.get(filters.category, filters.category|replace('_', '
+                        ')|title) }}
+                    </span>
+                    {% endif %} {% if filters.service_level %}
+                    <span class="badge bg-light text-dark border">
+                        Service: {{ merchant_service_level_labels.get(filters.service_level,
+                        filters.service_level|replace('_', ' ')|title) }}
+                    </span>
+                    {% endif %} {% if filters.cuisine %}
+                    <span class="badge bg-light text-dark border">Cuisine: {{ filters.cuisine }}</span>
+                    {% endif %} {% if filters.menu_focus %}
+                    <span class="badge bg-light text-dark border">Menu Focus: {{ filters.menu_focus }}</span>
+                    {% endif %} {% if filters.is_chain == "true" %}
+                    <span class="badge bg-light text-dark border">Chain: Chain</span>
+                    {% elif filters.is_chain == "false" %}
+                    <span class="badge bg-light text-dark border">Chain: Independent</span>
+                    {% endif %} {% if filters.has_description == "yes" %}
+                    <span class="badge bg-light text-dark border">Description: Has Description</span>
+                    {% elif filters.has_description == "no" %}
+                    <span class="badge bg-light text-dark border">Description: No Description</span>
+                    {% endif %} {% if filters.restaurant_status == "without_restaurants" %}
+                    <span class="badge bg-light text-dark border">Restaurants: Missing Restaurants</span>
+                    {% elif filters.restaurant_status == "with_restaurants" %}
+                    <span class="badge bg-light text-dark border">Restaurants: Has Restaurants</span>
+                    {% endif %}
+                </div>
+                <a href="{{ url_for('merchants.list_merchants') }}" class="btn btn-sm btn-outline-secondary">
+                    <i class="fas fa-undo me-1"></i>Clear filters
+                </a>
+            </div>
+            {% endif %} {% if association_summary.merchants_without_restaurants or
+            association_summary.total_unlinked_restaurants %}
+            <div class="row g-3">
+                <div class="col-lg-6">
+                    <div class="card h-100 border-0 bg-light">
+                        <div class="card-body">
+                            <div class="small text-uppercase text-muted mb-1">Missing Restaurants</div>
+                            <h5 class="mb-2"
+                                >{{ association_summary.merchants_without_restaurants }} merchant{{ 's' if
+                                association_summary.merchants_without_restaurants != 1 else '' }} need linked
+                                restaurants</h5
+                            >
+                            <p class="text-muted small mb-3"
+                                >Add a new restaurant when the brand exists but the location is missing from your
+                                tracking.</p
+                            >
+                            <a
+                                href="{{ url_for('merchants.list_merchants', restaurant_status='without_restaurants') }}"
+                                class="btn btn-sm btn-warning">
+                                <i class="fas fa-filter me-1"></i>Filter Missing Restaurants
+                            </a>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-lg-6">
+                    <div class="card h-100 border-0 bg-light">
+                        <div class="card-body">
+                            <div class="small text-uppercase text-muted mb-1">Missing Merchants</div>
+                            <h5 class="mb-2"
+                                >{{ association_summary.total_unlinked_restaurants }} restaurant{{ 's' if
+                                association_summary.total_unlinked_restaurants != 1 else '' }} still need a merchant</h5
+                            >
+                            <p class="text-muted small mb-3"
+                                >Review suggested matches or create missing merchants from the association workflow
+                                instead of hunting through restaurant pages.</p
+                            >
+                            <div class="d-flex flex-wrap gap-2">
+                                <a
+                                    href="{{ url_for('merchants.review_restaurant_associations') }}"
+                                    class="btn btn-sm btn-outline-primary">
+                                    <i class="fas fa-link me-1"></i>Review Associations
+                                </a>
+                                <a
+                                    href="{{ url_for('merchants.new_merchant') }}"
+                                    class="btn btn-sm btn-outline-secondary">
+                                    <i class="fas fa-plus me-1"></i>Add Merchant
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
         </div>
     </div>
 
@@ -108,74 +341,195 @@
         <a href="{{ url_for('merchants.new_merchant') }}">Add your first merchant</a> to get started.
     </div>
     {% else %}
-    <div class="row g-3 {% if view_preference == 'table' %}d-none{% endif %}" id="card-view-container">
+    <div id="card-view-container" class="mb-4{% if view_preference == 'table' %} d-none{% endif %}">
         {% for merchant in merchants %} {% set merchant_stats = (merchant_data or {}).get(merchant.id, {}) %} {% set
-        restaurant_count = merchant_stats.restaurant_count or 0 %}
-        <div class="col-12">
+        restaurant_count = merchant_stats.restaurant_count or 0 %} {% set rewards_link = (merchant_rewards_links or
+        {}).get(merchant.id) %} {% set suggested_match_count = (suggested_counts_by_merchant or {}).get(merchant.id, 0)
+        %} {% set suggest_chain_status = not merchant.is_chain and restaurant_count > 1 %}
+        <div class="col">
             <div class="card h-100">
                 <div class="card-body">
                     <div class="d-flex justify-content-between align-items-start">
-                        <div class="d-flex gap-2">
-                            <div class="restaurant-icon flex-shrink-0">
-                                {% if merchant.website %}
-                                <img
-                                    src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"
-                                    data-website="{{ merchant.website }}"
-                                    data-size="24"
-                                    alt="{{ merchant.name }} icon"
-                                    class="restaurant-favicon"
-                                    width="24"
-                                    height="24" />
-                                <i class="fas fa-building text-primary restaurant-fallback-icon d-none"></i>
-                                {% else %}
-                                <i class="fas fa-building text-primary"></i>
+                        <div class="merchant-card-main">
+                            <div class="d-flex gap-2 align-items-start">
+                                <div class="restaurant-icon flex-shrink-0">
+                                    {% if merchant.favicon_url %}
+                                    <img
+                                        src="{{ url_for('static', filename='img/favicons/favicon-32x32.png') }}"
+                                        data-favicon-url="{{ merchant.favicon_url }}"
+                                        data-size="24"
+                                        alt="{{ merchant.name }} icon"
+                                        class="restaurant-favicon"
+                                        width="24"
+                                        height="24" />
+                                    <i class="fas fa-building text-primary restaurant-fallback-icon d-none"></i>
+                                    {% elif merchant.website %}
+                                    <img
+                                        src="{{ url_for('static', filename='img/favicons/favicon-32x32.png') }}"
+                                        data-website="{{ merchant.website }}"
+                                        data-size="24"
+                                        alt="{{ merchant.name }} icon"
+                                        class="restaurant-favicon"
+                                        width="24"
+                                        height="24" />
+                                    <i class="fas fa-building text-primary restaurant-fallback-icon d-none"></i>
+                                    {% else %}
+                                    <i class="fas fa-building text-primary"></i>
+                                    {% endif %}
+                                </div>
+                                <div class="merchant-card-content">
+                                    <h5 class="card-title mb-1">{{ merchant.name }}</h5>
+                                    {% if merchant.short_name %}
+                                    <div class="text-muted small">Short name: {{ merchant.short_name }}</div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            {% if merchant.cuisine or merchant.service_level or merchant.category or merchant.is_chain
+                            or suggested_match_count > 0 or suggest_chain_status %}
+                            <div class="d-flex flex-wrap align-items-center gap-2 mt-2 merchant-card-badges">
+                                <span
+                                    class="badge {% if merchant.is_chain %}bg-primary-subtle text-primary border border-primary-subtle{% else %}bg-secondary-subtle text-secondary border border-secondary-subtle{% endif %}">
+                                    {{ 'Chain' if merchant.is_chain else 'Independent' }}
+                                </span>
+                                {% if merchant.category %}
+                                <span class="badge bg-light text-dark border">{{ merchant.category_display }}</span>
+                                {% endif %} {% if merchant.cuisine %} {{ cuisine_badge(merchant.cuisine, size='sm') }}
+                                {% endif %} {% if merchant.service_level %} {{
+                                service_level_badge(merchant.service_level, size='sm') }} {% endif %} {% if
+                                suggested_match_count > 0 %}
+                                <span class="badge bg-success-subtle text-success border border-success-subtle">
+                                    <i class="fas fa-link me-1"></i>{{ suggested_match_count }} suggestion{{ 's' if
+                                    suggested_match_count != 1 else '' }} ready
+                                </span>
+                                {% endif %} {% if suggest_chain_status %}
+                                <span class="badge bg-warning-subtle text-warning border border-warning-subtle">
+                                    Suggest Chain: {{ restaurant_count }} locations
+                                </span>
                                 {% endif %}
                             </div>
-                            <div>
-                                <h5 class="card-title mb-1">{{ merchant.name }}</h5>
-                                {% if merchant.short_name %}
-                                <div class="text-muted small">Short name: {{ merchant.short_name }}</div>
-                                {% endif %} {% if merchant.category %}
-                                <span class="badge bg-secondary">{{ merchant.category|replace('_', ' ')|title }}</span>
-                                {% endif %}
+                            {% endif %} {% if merchant.menu_focus %}
+                            <div
+                                class="merchant-card-meta text-muted small mt-2"
+                                data-bs-toggle="tooltip"
+                                title="{{ merchant.menu_focus }}">
+                                <i class="fas fa-clipboard-list me-1"></i>{{ merchant.menu_focus }}
                             </div>
+                            {% endif %} {% if merchant.description %}
+                            <div
+                                class="merchant-card-description text-muted small mt-2"
+                                data-bs-toggle="tooltip"
+                                title="{{ merchant.description }}">
+                                {{ merchant.description }}
+                            </div>
+                            {% endif %}
                         </div>
-                        <div class="dropdown">
-                            <button class="btn btn-sm btn-outline-secondary" data-bs-toggle="dropdown">
-                                <i class="fas fa-ellipsis-v"></i>
-                            </button>
-                            <ul class="dropdown-menu dropdown-menu-end">
-                                <li
-                                    ><a
-                                        class="dropdown-item"
-                                        href="{{ url_for('merchants.view_merchant', merchant_id=merchant.id) }}"
-                                        ><i class="fas fa-eye me-2"></i>View</a
-                                    ></li
-                                >
-                                <li
-                                    ><a
-                                        class="dropdown-item"
-                                        href="{{ url_for('merchants.edit_merchant', merchant_id=merchant.id) }}"
-                                        ><i class="fas fa-edit me-2"></i>Edit</a
-                                    ></li
-                                >
-                                <li><hr class="dropdown-divider" /></li>
-                                <li
-                                    ><a
-                                        class="dropdown-item text-danger"
-                                        href="#"
-                                        data-delete-url="{{ url_for('merchants.delete_merchant', merchant_id=merchant.id) }}"
-                                        data-merchant-name="{{ merchant.name }}"
-                                        ><i class="fas fa-trash me-2"></i>Delete</a
-                                    ></li
-                                >
-                            </ul>
+                        <div class="d-flex align-items-center gap-2">
+                            {% if rewards_link %}
+                            <span
+                                class="text-warning"
+                                data-bs-toggle="tooltip"
+                                title="Rewards program linked: {{ rewards_link.rewards_program.name }}">
+                                <i class="fas fa-award"></i>
+                            </span>
+                            {% endif %}
+                            <div class="dropdown">
+                                <button class="btn btn-sm btn-outline-secondary" data-bs-toggle="dropdown">
+                                    <i class="fas fa-ellipsis-v"></i>
+                                </button>
+                                <ul class="dropdown-menu dropdown-menu-end">
+                                    <li
+                                        ><a
+                                            class="dropdown-item"
+                                            href="{{ url_for('merchants.view_merchant', merchant_id=merchant.id) }}"
+                                            ><i class="fas fa-eye me-2"></i>View</a
+                                        ></li
+                                    >
+                                    <li
+                                        ><a
+                                            class="dropdown-item"
+                                            href="{{ url_for('merchants.edit_merchant', merchant_id=merchant.id) }}"
+                                            ><i class="fas fa-edit me-2"></i>Edit</a
+                                        ></li
+                                    >
+                                    <li><hr class="dropdown-divider" /></li>
+                                    <li
+                                        ><a
+                                            class="dropdown-item text-danger"
+                                            href="#"
+                                            data-delete-url="{{ url_for('merchants.delete_merchant', merchant_id=merchant.id) }}"
+                                            data-merchant-name="{{ merchant.name }}"
+                                            data-linked-restaurant-count="{{ restaurant_count }}"
+                                            ><i class="fas fa-trash me-2"></i>Delete</a
+                                        ></li
+                                    >
+                                </ul>
+                            </div>
                         </div>
                     </div>
-                    <p class="card-text text-muted small mt-2">
-                        <i class="fas fa-utensils me-1"></i>
-                        {{ restaurant_count }} restaurant{{ 's' if restaurant_count != 1 else '' }}
-                    </p>
+                    <div class="card-text text-muted small mt-3 d-flex flex-column gap-1">
+                        <span
+                            ><i class="fas fa-utensils me-1"></i>{{ restaurant_count }} restaurant{{ 's' if
+                            restaurant_count != 1 else '' }}</span
+                        >
+                        <span
+                            ><i class="fas fa-receipt me-1"></i>{{ merchant_stats.expense_count or 0 }} expense{{ 's' if
+                            (merchant_stats.expense_count or 0) != 1 else '' }}</span
+                        >
+                        <span
+                            ><i class="fas fa-dollar-sign me-1"></i>{{ (merchant_stats.total_amount or
+                            0)|format_currency_usd }} total spend</span
+                        >
+                        {% if merchant.website %}
+                        <span>
+                            <i class="fas fa-globe me-1"></i>
+                            <a
+                                href="{{ merchant.website }}"
+                                class="text-muted text-decoration-none"
+                                target="_blank"
+                                rel="noopener noreferrer">
+                                {{ merchant.website }}
+                            </a>
+                        </span>
+                        {% endif %} {% if merchant_stats.last_expense_date %}
+                        <span
+                            ><i class="far fa-calendar-alt me-1"></i>Last expense {{
+                            merchant_stats.last_expense_date|time_ago }}</span
+                        >
+                        {% endif %}
+                    </div>
+                    <div class="d-flex flex-wrap gap-2 mt-3">
+                        <a
+                            href="{{ url_for('restaurants.add_restaurant', merchant_id=merchant.id, name=merchant.name, website=merchant.website or '', cuisine=merchant.cuisine or '', service_level=merchant.service_level or '', search_query=merchant.short_name or merchant.name) }}"
+                            class="btn btn-sm {% if restaurant_count == 0 %}btn-warning{% else %}btn-outline-primary{% endif %}">
+                            <i class="fas fa-utensils me-1"></i>Add Restaurant
+                        </a>
+                        {% if suggested_match_count > 0 %}
+                        <a
+                            href="{{ url_for('merchants.review_restaurant_associations') }}"
+                            class="btn btn-sm btn-outline-success">
+                            <i class="fas fa-link me-1"></i>Review {{ suggested_match_count }} suggestion{{ 's' if
+                            suggested_match_count != 1 else '' }}
+                        </a>
+                        {% endif %} {% if rewards_link %}
+                        <a
+                            href="{{ url_for('loyalty.view_rewards_program', program_id=rewards_link.rewards_program_id) }}"
+                            class="btn btn-sm btn-outline-secondary">
+                            {% if rewards_link.rewards_program.website or rewards_link.rewards_program.portal_url %}
+                            <img
+                                src="{{ url_for('static', filename='img/favicons/favicon-32x32.png') }}"
+                                data-website="{{ rewards_link.rewards_program.website or rewards_link.rewards_program.portal_url }}"
+                                data-size="16"
+                                alt="{{ rewards_link.rewards_program.name }} icon"
+                                class="restaurant-favicon-table me-1"
+                                width="16"
+                                height="16" />
+                            <i class="fas fa-award text-warning restaurant-fallback-icon d-none me-1"></i>
+                            {% else %}
+                            <i class="fas fa-award text-warning me-1"></i>
+                            {% endif %} View Rewards
+                        </a>
+                        {% endif %}
+                    </div>
                 </div>
             </div>
         </div>
@@ -257,8 +611,32 @@
                                             data-sort="true"
                                             data-sort-type="text"
                                             data-bs-toggle="tooltip"
-                                            title="Merchant category"
-                                            >Category</th
+                                            title="Merchant service level"
+                                            >Service Level</th
+                                        >
+                                        <th
+                                            scope="col"
+                                            data-sort="true"
+                                            data-sort-type="text"
+                                            data-bs-toggle="tooltip"
+                                            title="Merchant cuisine"
+                                            >Cuisine</th
+                                        >
+                                        <th
+                                            scope="col"
+                                            data-sort="true"
+                                            data-sort-type="text"
+                                            data-bs-toggle="tooltip"
+                                            title="Merchant menu focus"
+                                            >Menu Focus</th
+                                        >
+                                        <th
+                                            scope="col"
+                                            data-sort="true"
+                                            data-sort-type="text"
+                                            data-bs-toggle="tooltip"
+                                            title="Merchant format category"
+                                            >Format</th
                                         >
                                         <th
                                             scope="col"
@@ -266,16 +644,42 @@
                                             data-sort-type="number"
                                             data-bs-toggle="tooltip"
                                             title="Linked restaurant count"
+                                            class="text-end"
                                             >Restaurants</th
+                                        >
+                                        <th
+                                            scope="col"
+                                            data-sort="true"
+                                            data-sort-type="number"
+                                            data-bs-toggle="tooltip"
+                                            title="Expense count across linked restaurants"
+                                            class="text-end"
+                                            >Expenses</th
+                                        >
+                                        <th
+                                            scope="col"
+                                            data-sort="true"
+                                            data-sort-type="currency"
+                                            data-bs-toggle="tooltip"
+                                            title="Total spend across linked restaurants"
+                                            class="text-end"
+                                            >Total Spend</th
                                         >
                                     </tr>
                                 </thead>
                                 <tbody>
                                     {% for merchant in merchants %} {% set merchant_stats = (merchant_data or
                                     {}).get(merchant.id, {}) %} {% set restaurant_count =
-                                    merchant_stats.restaurant_count or 0 %}
+                                    merchant_stats.restaurant_count or 0 %} {% set rewards_link =
+                                    (merchant_rewards_links or {}).get(merchant.id) %} {% set suggested_match_count =
+                                    (suggested_counts_by_merchant or {}).get(merchant.id, 0) %} {% set
+                                    suggest_chain_status = (not merchant.is_chain and restaurant_count > 1) %}
                                     <tr
                                         data-merchant-category="{{ merchant.category|default('Uncategorized', true) }}"
+                                        data-merchant-service-level-group="{{ merchant.service_level_display|default('Unspecified', true) }}"
+                                        data-merchant-cuisine-group="{{ merchant.cuisine|default('Unspecified', true) }}"
+                                        data-merchant-menu-focus-group="{{ merchant.menu_focus|default('Unspecified', true) }}"
+                                        data-merchant-format-group="{{ merchant.category_display|default('Unspecified', true) }}"
                                         aria-selected="false">
                                         <td class="text-center select-col">
                                             <input
@@ -285,6 +689,7 @@
                                                 value="{{ merchant.id }}"
                                                 data-merchant-id="{{ merchant.id }}"
                                                 data-merchant-name="{{ merchant.name }}"
+                                                data-linked-restaurant-count="{{ restaurant_count }}"
                                                 data-view-url="{{ url_for('merchants.view_merchant', merchant_id=merchant.id) }}"
                                                 data-edit-url="{{ url_for('merchants.edit_merchant', merchant_id=merchant.id) }}"
                                                 data-delete-url="{{ url_for('merchants.delete_merchant', merchant_id=merchant.id) }}" />
@@ -292,9 +697,18 @@
                                         <td data-sort-value="{{ merchant.name }}">
                                             <div class="d-flex align-items-center gap-2">
                                                 <div class="restaurant-icon flex-shrink-0">
-                                                    {% if merchant.website %}
+                                                    {% if merchant.favicon_url %}
                                                     <img
-                                                        src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"
+                                                        src="{{ url_for('static', filename='img/favicons/favicon-32x32.png') }}"
+                                                        data-favicon-url="{{ merchant.favicon_url }}"
+                                                        data-size="20"
+                                                        alt="{{ merchant.name }} icon"
+                                                        class="restaurant-favicon-table"
+                                                        width="20"
+                                                        height="20" />
+                                                    {% elif merchant.website %}
+                                                    <img
+                                                        src="{{ url_for('static', filename='img/favicons/favicon-32x32.png') }}"
                                                         data-website="{{ merchant.website }}"
                                                         data-size="20"
                                                         alt="{{ merchant.name }} icon"
@@ -312,20 +726,89 @@
                                                     >
                                                     {% if merchant.short_name %}
                                                     <div class="text-muted small">{{ merchant.short_name }}</div>
+                                                    {% endif %} {% if rewards_link %}
+                                                    <div class="small text-warning">
+                                                        <i class="fas fa-award me-1"></i>Rewards linked
+                                                    </div>
+                                                    {% endif %} {% if suggested_match_count > 0 %}
+                                                    <div class="small mt-1">
+                                                        <span
+                                                            class="badge bg-success-subtle text-success border border-success-subtle">
+                                                            <i class="fas fa-link me-1"></i>{{ suggested_match_count }}
+                                                            suggestion{{ 's' if suggested_match_count != 1 else '' }}
+                                                            ready
+                                                        </span>
+                                                    </div>
+                                                    {% endif %} {% if suggest_chain_status %}
+                                                    <div class="small mt-1">
+                                                        <span
+                                                            class="badge bg-warning-subtle text-warning border border-warning-subtle">
+                                                            Suggest Chain: {{ restaurant_count }} locations
+                                                        </span>
+                                                    </div>
                                                     {% endif %}
                                                 </div>
                                             </div>
                                         </td>
-                                        <td data-sort-value="{{ merchant.category|default('Uncategorized', true) }}">
-                                            {% if merchant.category %}
-                                            <span class="badge bg-secondary"
-                                                >{{ merchant.category|replace('_', ' ')|title }}</span
+                                        <td
+                                            data-sort-value="{{ merchant.service_level_display|default('Unspecified', true) }}">
+                                            {% if merchant.service_level %}
+                                            <span class="badge bg-info text-dark"
+                                                >{{ merchant.service_level_display }}</span
                                             >
                                             {% else %}
-                                            <span class="text-muted">Uncategorized</span>
+                                            <span class="text-muted">Not set</span>
                                             {% endif %}
                                         </td>
-                                        <td data-sort-value="{{ restaurant_count }}">{{ restaurant_count }}</td>
+                                        <td data-sort-value="{{ merchant.cuisine|default('Unspecified', true) }}">
+                                            {% if merchant.cuisine %} {{ cuisine_badge(merchant.cuisine, size='sm') }}
+                                            {% else %}
+                                            <span class="text-muted">Unspecified</span>
+                                            {% endif %}
+                                        </td>
+                                        <td data-sort-value="{{ merchant.menu_focus|default('Unspecified', true) }}">
+                                            {% if merchant.menu_focus %}
+                                            <span>{{ merchant.menu_focus }}</span>
+                                            {% else %}
+                                            <span class="text-muted">Unspecified</span>
+                                            {% endif %}
+                                        </td>
+                                        <td
+                                            data-sort-value="{{ merchant.category_display|default('Unspecified', true) }}">
+                                            {% if merchant.category %}
+                                            <span class="badge bg-light text-dark border"
+                                                >{{ merchant.category_display }}</span
+                                            >
+                                            {% else %}
+                                            <span class="text-muted">Unspecified</span>
+                                            {% endif %}
+                                        </td>
+                                        <td class="text-end" data-sort-value="{{ restaurant_count }}"
+                                            >{{ restaurant_count }}</td
+                                        >
+                                        <td class="text-end" data-sort-value="{{ merchant_stats.expense_count or 0 }}"
+                                            >{{ merchant_stats.expense_count or 0 }}</td
+                                        >
+                                        <td class="text-end" data-sort-value="{{ merchant_stats.total_amount or 0 }}">
+                                            <div>{{ (merchant_stats.total_amount or 0)|format_currency_usd }}</div>
+                                            {% if suggested_match_count > 0 %}
+                                            <div class="mt-1">
+                                                <a
+                                                    href="{{ url_for('merchants.review_restaurant_associations') }}"
+                                                    class="btn btn-sm btn-outline-success">
+                                                    <i class="fas fa-link me-1"></i>Review
+                                                </a>
+                                            </div>
+                                            {% elif restaurant_count == 0 %}
+                                            <div class="mt-1">
+                                                <a
+                                                    href="{{ url_for('restaurants.add_restaurant', merchant_id=merchant.id, name=merchant.name, website=merchant.website or '', cuisine=merchant.cuisine or '', service_level=merchant.service_level or '', search_query=merchant.short_name or merchant.name) }}"
+                                                    class="btn btn-sm btn-outline-primary">
+                                                    <i class="fas fa-utensils me-1"></i>Add Restaurant
+                                                </a>
+                                            </div>
+                                            {% endif %}
+                                        </td>
                                     </tr>
                                     {% endfor %}
                                 </tbody>
@@ -337,6 +820,143 @@
         </div>
     </div>
     {% endif %}
+</div>
+
+<div class="modal fade" id="merchantFilterModal" tabindex="-1" aria-labelledby="merchantFilterModalLabel">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="merchantFilterModalLabel">Filter Merchants</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="merchant-filter-form" method="get" class="row g-3" novalidate>
+                    <input type="hidden" name="q" value="{{ filters.search }}" />
+                    <div class="col-md-4">
+                        <label for="merchant-filter-category" class="form-label">Format</label>
+                        <select id="merchant-filter-category" name="category" class="form-control">
+                            <option value="">All Formats</option>
+                            {% for cat in categories %}
+                            <option value="{{ cat }}" {% if filters.category == cat %}selected{% endif %}>
+                                {{ merchant_format_labels.get(cat, cat|replace('_', ' ')|title) }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <label for="merchant-filter-service-level" class="form-label">Service Level</label>
+                        <select id="merchant-filter-service-level" name="service_level" class="form-control">
+                            <option value="">All Service Levels</option>
+                            {% for level in service_levels %}
+                            <option value="{{ level }}" {% if filters.service_level == level %}selected{% endif %}>
+                                {{ merchant_service_level_labels.get(level, level|replace('_', ' ')|title) }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <label for="merchant-filter-cuisine" class="form-label">Cuisine</label>
+                        <select id="merchant-filter-cuisine" name="cuisine" class="form-control">
+                            <option value="">All Cuisines</option>
+                            {% for cuisine in cuisine_filters %}
+                            <option value="{{ cuisine }}" {% if filters.cuisine == cuisine %}selected{% endif %}>
+                                {{ cuisine }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <label for="merchant-filter-menu-focus" class="form-label">Menu Focus</label>
+                        <select id="merchant-filter-menu-focus" name="menu_focus" class="form-control">
+                            <option value="">All Menu Focuses</option>
+                            {% for menu_focus in menu_focus_filters %}
+                            <option
+                                value="{{ menu_focus }}"
+                                {% if filters.menu_focus == menu_focus %}selected{% endif %}>
+                                {{ menu_focus }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <label for="merchant-filter-is-chain" class="form-label">Chain</label>
+                        <select id="merchant-filter-is-chain" name="is_chain" class="form-control">
+                            <option value="">All</option>
+                            <option value="true" {% if filters.is_chain == 'true' %}selected{% endif %}>Chain</option>
+                            <option value="false" {% if filters.is_chain == 'false' %}selected{% endif %}
+                                >Independent</option
+                            >
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <label for="merchant-filter-has-description" class="form-label">Description</label>
+                        <select id="merchant-filter-has-description" name="has_description" class="form-control">
+                            <option value="">Any Description</option>
+                            <option value="yes" {% if filters.has_description == 'yes' %}selected{% endif %}
+                                >Has Description</option
+                            >
+                            <option value="no" {% if filters.has_description == 'no' %}selected{% endif %}
+                                >No Description</option
+                            >
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <label for="merchant-filter-restaurant-status" class="form-label">Restaurant Coverage</label>
+                        <select id="merchant-filter-restaurant-status" name="restaurant_status" class="form-control">
+                            <option value="">All Merchants</option>
+                            <option
+                                value="without_restaurants"
+                                {% if filters.restaurant_status == 'without_restaurants' %}selected{% endif %}
+                                >Missing Restaurants</option
+                            >
+                            <option
+                                value="with_restaurants"
+                                {% if filters.restaurant_status == 'with_restaurants' %}selected{% endif %}
+                                >Has Restaurants</option
+                            >
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <label for="merchant-filter-sort" class="form-label">Sort By</label>
+                        <select id="merchant-filter-sort" name="sort" class="form-control">
+                            <option value="name" {% if filters.sort == 'name' %}selected{% endif %}
+                                >Sort by Name</option
+                            >
+                            <option value="restaurants" {% if filters.sort == 'restaurants' %}selected{% endif %}
+                                >Sort by Restaurants</option
+                            >
+                            <option value="expenses" {% if filters.sort == 'expenses' %}selected{% endif %}
+                                >Sort by Expenses</option
+                            >
+                            <option value="spend" {% if filters.sort == 'spend' %}selected{% endif %}
+                                >Sort by Spend</option
+                            >
+                            <option value="last_activity" {% if filters.sort == 'last_activity' %}selected{% endif %}
+                                >Sort by Last Activity</option
+                            >
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <label for="merchant-filter-order" class="form-label">Order</label>
+                        <select id="merchant-filter-order" name="order" class="form-control">
+                            <option value="asc" {% if filters.order == 'asc' %}selected{% endif %}>Ascending</option>
+                            <option value="desc" {% if filters.order == 'desc' %}selected{% endif %}
+                                >Descending</option
+                            >
+                        </select>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" id="merchant-filter-clear">
+                    <i class="fas fa-undo me-2" aria-hidden="true"></i>Clear All
+                </button>
+                <button type="button" class="btn btn-primary" id="merchant-filter-apply">
+                    <i class="fas fa-check me-2" aria-hidden="true"></i>Apply
+                </button>
+            </div>
+        </div>
+    </div>
 </div>
 
 <div class="modal fade" id="deleteMerchantModal" tabindex="-1" aria-labelledby="deleteMerchantModalLabel">
@@ -354,9 +974,14 @@
             </div>
             <div class="modal-body">
                 <p>Are you sure you want to delete <strong id="merchantName"></strong>?</p>
+                <p class="mb-2">
+                    <strong id="merchantLinkedRestaurantCount">0</strong> linked restaurant(s) will be unassigned and
+                    kept.
+                </p>
                 <p class="text-danger">
                     <i class="fas fa-exclamation-circle me-2"></i>
-                    This will unlink all restaurants from this merchant. This action cannot be undone.
+                    The merchant will be deleted. Linked restaurants and expenses will not be deleted. This action
+                    cannot be undone.
                 </p>
             </div>
             <div class="modal-footer">
@@ -388,9 +1013,10 @@
             </div>
             <div class="modal-body">
                 <p>You are about to delete <strong data-merchant-bulk-count>0</strong> merchants.</p>
+                <p class="mb-2">Any linked restaurants will be unassigned and kept.</p>
                 <p class="text-danger mb-0">
                     <i class="fas fa-exclamation-circle me-2"></i>
-                    This action cannot be undone.
+                    The selected merchants will be deleted. Restaurants and expenses will not be deleted.
                 </p>
             </div>
             <div class="modal-footer">

@@ -17,6 +17,30 @@ This document outlines planned features and enhancements for the Meal Expense Tr
 
 ## High-Impact Features (Quick Wins)
 
+### Guided Expense Import Review 🔥
+
+**Description:**
+
+- Review Quicken Simplifi and other bank-style imports row by row before final import
+- Suggest restaurant matches using payee-to-restaurant name comparison
+- Surface likely duplicates using exact absolute amount and a one-to-three-day date window
+- Allow users to choose per row whether to match an existing restaurant, create a restaurant, or skip
+
+**User Value:** Makes bank-export imports trustworthy and prevents accidental duplicates or noisy restaurant creation
+
+**Technical Considerations:**
+
+- Add Simplifi-aware parsing and field normalization
+- Add duplicate-candidate generation separate from final import commit
+- Add a review-step UI modeled after explicit association workflows
+- Preserve user overrides for restaurant resolution and skip decisions
+
+**Estimated Effort:** Medium-High (2-4 weeks)
+
+**Dependencies:** Expense import infrastructure (existing, needs redesign for review step)
+
+---
+
 ### 1. Budget Tracking and Alerts 🔥
 
 **Description:**

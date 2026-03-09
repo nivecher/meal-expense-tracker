@@ -1,0 +1,148 @@
+{% extends "admin/base.html" %} {% block page_actions %}
+<div class="btn-group" role="group">
+    <a href="{{ url_for('admin.list_users') }}" class="btn btn-outline-secondary">
+        <i class="fas fa-arrow-left me-1"></i>
+        Back to Users
+    </a>
+</div>
+{% endblock page_actions %} {% block admin_content %}
+<div class="row justify-content-center">
+    <div class="col-lg-8">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-file-import me-2"></i>
+                    Import User Backup
+                </h5>
+            </div>
+            <div class="card-body">
+                <p class="text-muted">
+                    Upload a user backup JSON file exported from the admin area. This restores the user profile and all
+                    user-owned records. External assets such as receipt files or avatars are restored by reference only.
+                </p>
+
+                <form method="POST" enctype="multipart/form-data">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+
+                    <div class="mb-3">
+                        <label for="backup_file" class="form-label">Backup JSON File</label>
+                        <input
+                            class="form-control"
+                            type="file"
+                            id="backup_file"
+                            name="backup_file"
+                            accept=".json,application/json"
+                            required />
+                    </div>
+
+                    <div class="mb-4">
+                        <label class="form-label">Import Mode</label>
+                        <div class="form-check">
+                            <input
+                                class="form-check-input"
+                                type="radio"
+                                name="import_mode"
+                                id="import_mode_restore"
+                                value="restore"
+                                checked />
+                            <label class="form-check-label" for="import_mode_restore">
+                                Restore the original user identity from the backup
+                            </label>
+                        </div>
+                        <div class="form-check">
+                            <input
+                                class="form-check-input"
+                                type="radio"
+                                name="import_mode"
+                                id="import_mode_replace_existing"
+                                value="replace_existing" />
+                            <label class="form-check-label" for="import_mode_replace_existing">
+                                Replace an existing user with the same username or email, then restore the backup
+                            </label>
+                        </div>
+                        <div class="form-check">
+                            <input
+                                class="form-check-input"
+                                type="radio"
+                                name="import_mode"
+                                id="import_mode_create_new"
+                                value="create_new" />
+                            <label class="form-check-label" for="import_mode_create_new">
+                                Create a new user from the backup data with new account credentials
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="row g-3 mb-4">
+                        <div class="col-md-6">
+                            <label for="new_username" class="form-label">New Username</label>
+                            <input
+                                type="text"
+                                class="form-control"
+                                id="new_username"
+                                name="new_username"
+                                placeholder="Required for create new mode" />
+                        </div>
+                        <div class="col-md-6">
+                            <label for="new_email" class="form-label">New Email</label>
+                            <input
+                                type="email"
+                                class="form-control"
+                                id="new_email"
+                                name="new_email"
+                                placeholder="Required for create new mode" />
+                        </div>
+                        <div class="col-md-6">
+                            <label for="new_password" class="form-label">New Password</label>
+                            <input
+                                type="text"
+                                class="form-control"
+                                id="new_password"
+                                name="new_password"
+                                placeholder="Optional. Leave blank to auto-generate." />
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-check mt-4">
+                                <input
+                                    class="form-check-input"
+                                    type="checkbox"
+                                    id="activate_new_user"
+                                    name="activate_new_user"
+                                    checked />
+                                <label class="form-check-label" for="activate_new_user">Activate new user</label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="grant_admin" name="grant_admin" />
+                                <label class="form-check-label" for="grant_admin">Grant admin access to new user</label>
+                            </div>
+                            <div class="form-check">
+                                <input
+                                    class="form-check-input"
+                                    type="checkbox"
+                                    id="preserve_advanced_features"
+                                    name="preserve_advanced_features"
+                                    checked />
+                                <label class="form-check-label" for="preserve_advanced_features">
+                                    Preserve advanced features setting
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="alert alert-warning mb-4">
+                        <i class="fas fa-exclamation-triangle me-2"></i>
+                        Replace mode permanently deletes the matching existing account and all of its current related
+                        data before the backup is restored. Create-new mode keeps the original backed-up identity out of
+                        the login flow by requiring a new username and email.
+                    </div>
+
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-upload me-1"></i>
+                        Import Backup
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

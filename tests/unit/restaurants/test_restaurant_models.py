@@ -115,10 +115,10 @@ def test_restaurant_properties(test_restaurant) -> None:
     assert test_restaurant.full_name == test_restaurant.name
 
 
-def test_display_name_prefers_location_name_when_present() -> None:
-    """Display name should use location name before restaurant name."""
+def test_display_name_without_merchant_uses_name_and_location_when_present() -> None:
+    """Display name should use restaurant name + location when merchant is not set."""
     restaurant = Restaurant(name="Chipotle", location_name="Downtown")
-    assert restaurant.display_name == "Downtown"
+    assert restaurant.display_name == "Chipotle - Downtown"
 
 
 def test_display_name_uses_merchant_short_name_with_location_name() -> None:
@@ -127,7 +127,52 @@ def test_display_name_uses_merchant_short_name_with_location_name() -> None:
     restaurant = Restaurant(name="Chipotle", location_name="Downtown")
     restaurant.merchant = merchant
 
-    assert restaurant.display_name == "Chipotle Downtown"
+    assert restaurant.display_name == "Chipotle - Downtown"
+
+
+def test_display_name_uses_merchant_name_when_short_name_missing() -> None:
+    """Display name should use merchant name when short name is missing."""
+    merchant = Merchant(name="Chili's Bar & Grill", short_name=None)
+    restaurant = Restaurant(name="Chili's Bar & Grill", location_name="Firewheel")
+    restaurant.merchant = merchant
+
+    assert restaurant.display_name == "Chili's Bar & Grill - Firewheel"
+
+
+def test_display_name_ignores_literal_none_short_name_and_uses_merchant_name() -> None:
+    """Display name should treat literal 'None' short_name as empty and use merchant name."""
+    merchant = Merchant(name="Chili's Bar & Grill", short_name="None")
+    restaurant = Restaurant(name="Chili's Bar & Grill", location_name="Firewheel")
+    restaurant.merchant = merchant
+
+    assert restaurant.display_name == "Chili's Bar & Grill - Firewheel"
+
+
+def test_display_name_backfills_location_from_name_when_merchant_matches() -> None:
+    """Display name should parse location from name for legacy rows."""
+    merchant = Merchant(name="Chili's Bar & Grill", short_name="Chili's")
+    restaurant = Restaurant(name="Chili's - Firewheel", location_name=None)
+    restaurant.merchant = merchant
+
+    assert restaurant.display_name == "Chili's - Firewheel"
+
+
+def test_needs_location_name_cta_for_chain_merchant_without_location_name() -> None:
+    """Chain-linked restaurants without a location name should trigger the CTA."""
+    merchant = Merchant(name="Chipotle", is_chain=True)
+    restaurant = Restaurant(name="Chipotle", location_name="  ")
+    restaurant.merchant = merchant
+
+    assert restaurant.needs_location_name_cta is True
+
+
+def test_needs_location_name_cta_is_false_when_location_name_present() -> None:
+    """Chain-linked restaurants with a location name should not trigger the CTA."""
+    merchant = Merchant(name="Chipotle", is_chain=True)
+    restaurant = Restaurant(name="Chipotle", location_name="Downtown")
+    restaurant.merchant = merchant
+
+    assert restaurant.needs_location_name_cta is False
 
 
 def test_restaurant_string_representation(test_restaurant) -> None:
@@ -150,3 +195,41 @@ def test_restaurant_expenses_relationship(test_restaurant, test_expense) -> None
     assert test_expense in test_restaurant.expenses
     assert test_expense.restaurant == test_restaurant
     assert test_restaurant.expenses[0].id == test_expense.id
+
+
+def test_update_from_google_places_description_fallback_only_when_empty(session, test_user) -> None:
+    """update_from_google_places sets description from place_data only when current description is empty."""
+    restaurant = Restaurant(
+        user_id=test_user.id,
+        name="Test Place",
+        city="Dallas",
+        type="restaurant",
+    )
+    session.add(restaurant)
+    session.commit()
+    assert restaurant.description is None or restaurant.description.strip() == ""
+
+    restaurant.update_from_google_places({"description": "Japanese Restaurant • Casual Dining"})
+    session.flush()
+    assert restaurant.description == "Japanese Restaurant • Casual Dining"
+
+    restaurant.update_from_google_places({"description": "Different description"})
+    session.flush()
+    assert restaurant.description == "Japanese Restaurant • Casual Dining"
+
+
+def test_update_from_google_places_does_not_overwrite_user_description(session, test_user) -> None:
+    """update_from_google_places must not overwrite a non-empty user-set description."""
+    restaurant = Restaurant(
+        user_id=test_user.id,
+        name="Test Place",
+        city="Dallas",
+        type="restaurant",
+        description="User wrote this",
+    )
+    session.add(restaurant)
+    session.commit()
+
+    restaurant.update_from_google_places({"description": "Google-generated description"})
+    session.flush()
+    assert restaurant.description == "User wrote this"

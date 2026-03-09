@@ -213,8 +213,7 @@ class RemoteAdminClient:
         if "content" in data:
             stats = data["content"]
             output.append(
-                f"📝 Content: {stats.get('restaurants', 0)} restaurants, "
-                f"{stats.get('expenses', 0)} expenses"
+                f"📝 Content: {stats.get('restaurants', 0)} restaurants, " f"{stats.get('expenses', 0)} expenses"
             )
 
     def _format_validation_results_output(self, data: dict[str, Any], output: list[str]) -> None:

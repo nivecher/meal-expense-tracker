@@ -5,6 +5,14 @@
         <i class="fas fa-arrow-left me-1"></i>
         Back to Users
     </a>
+    <a href="{{ url_for('admin.export_user', user_id=user.id) }}" class="btn btn-primary">
+        <i class="fas fa-file-export me-1"></i>
+        Export Backup
+    </a>
+    <a href="{{ url_for('admin.import_user_route') }}" class="btn btn-outline-primary">
+        <i class="fas fa-file-import me-1"></i>
+        Import Backup
+    </a>
     <a href="{{ url_for('admin.create_user') }}" class="btn btn-success">
         <i class="fas fa-user-plus me-1"></i>
         Create User
@@ -258,9 +266,30 @@
                     <div class="col-md-3">
                         <div class="text-center">
                             <div class="h3 text-warning"
-                                >{{ (stats.expense_count + stats.restaurant_count + stats.category_count) }}</div
+                                >{{ (stats.expense_count + stats.restaurant_count + stats.category_count +
+                                stats.tag_count + stats.visit_count + stats.receipt_count) }}</div
                             >
                             <div class="text-muted">Total Items</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="row mt-4">
+                    <div class="col-md-4">
+                        <div class="text-center">
+                            <div class="h4 text-secondary">{{ stats.tag_count }}</div>
+                            <div class="text-muted">Tags</div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="text-center">
+                            <div class="h4 text-secondary">{{ stats.visit_count }}</div>
+                            <div class="text-muted">Visits</div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="text-center">
+                            <div class="h4 text-secondary">{{ stats.receipt_count }}</div>
+                            <div class="text-muted">Receipts</div>
                         </div>
                     </div>
                 </div>

@@ -59,7 +59,6 @@ function ensureAddToMyRestaurantsHandler() {
         cuisine: restaurantData.cuisine || '',
         service_level: restaurantData.service_level || '',
         price_level: restaurantData.price_level ?? null,
-        is_chain: restaurantData.is_chain ? true : false,
         rating: restaurantData.rating || '',
         notes: restaurantData.notes || '',
         latitude: restaurantData.latitude ?? null,
@@ -104,41 +103,24 @@ function ensureAddToMyRestaurantsHandler() {
   };
 }
 
+function isActiveFilterValue(value) {
+  if (typeof value !== 'string') return false;
+  const normalized = value.trim();
+  return Boolean(normalized) && normalized !== 'None';
+}
+
+function getRestaurantUrlParams() {
+  return new URLSearchParams(window.location.search);
+}
+
 function getActiveRestaurantFilterCount() {
-  const urlParams = new URLSearchParams(window.location.search);
-  let count = 0;
-
-  const cuisine = urlParams.get('cuisine');
-  if (cuisine && cuisine !== 'None') {
-    count += 1;
-  }
-
-  const serviceLevel = urlParams.get('service_level');
-  if (serviceLevel && serviceLevel !== 'None') {
-    count += 1;
-  }
-
-  const city = urlParams.get('city');
-  if (city && city !== 'None') {
-    count += 1;
-  }
-
-  const isChain = urlParams.get('is_chain');
-  if (isChain && isChain !== 'None') {
-    count += 1;
-  }
-
-  const ratingMin = urlParams.get('rating_min');
-  if (ratingMin && ratingMin !== 'None') {
-    count += 1;
-  }
-
-  const ratingMax = urlParams.get('rating_max');
-  if (ratingMax && ratingMax !== 'None') {
-    count += 1;
-  }
-
-  return count;
+  const urlParams = getRestaurantUrlParams();
+  return ['cuisine', 'service_level', 'city', 'is_chain', 'merchant_status', 'missing_location_name', 'rating_min', 'rating_max'].reduce((count, key) => {
+    if (isActiveFilterValue(urlParams.get(key) || '')) {
+      return count + 1;
+    }
+    return count;
+  }, 0);
 }
 
 function updateRestaurantFilterIndicators() {
@@ -197,11 +179,25 @@ function setInputValue(inputId, value) {
   input.value = value || '';
 }
 
+function syncRestaurantFilterFormFromUrl() {
+  const urlParams = getRestaurantUrlParams();
+  setSelectValue('cuisine', urlParams.get('cuisine'));
+  setSelectValue('service_level', urlParams.get('service_level'));
+  setSelectValue('city', urlParams.get('city'));
+  setSelectValue('is_chain', urlParams.get('is_chain'));
+  setSelectValue('merchant_status', urlParams.get('merchant_status'));
+  setSelectValue('missing_location_name', urlParams.get('missing_location_name'));
+  setInputValue('rating_min', urlParams.get('rating_min'));
+  setInputValue('rating_max', urlParams.get('rating_max'));
+}
+
 function clearRestaurantFilters() {
   setSelectValue('cuisine', '');
   setSelectValue('service_level', '');
   setSelectValue('city', '');
   setSelectValue('is_chain', '');
+  setSelectValue('merchant_status', '');
+  setSelectValue('missing_location_name', '');
   setInputValue('rating_min', '');
   setInputValue('rating_max', '');
 
@@ -213,9 +209,11 @@ function clearRestaurantFilters() {
   }
 }
 
-function initRestaurantFilterClear() {
-  const clearButton = document.getElementById('restaurant-filter-clear');
-  if (!clearButton) return;
+function initRestaurantFilterClear(scope) {
+  const root = scope || document;
+  const clearButton =
+    root instanceof Document ? root.getElementById('restaurant-filter-clear') : root.querySelector('#restaurant-filter-clear');
+  if (!(clearButton instanceof HTMLElement)) return;
   clearButton.addEventListener('click', () => {
     clearRestaurantFilters();
   });
@@ -545,6 +543,41 @@ function buildRestaurantDeleteUrl(baseUrl, restaurantId) {
   return `${normalizedBase}/${restaurantId}`;
 }
 
+function ensureRestaurantFilterModal() {
+  const existing = document.getElementById('restaurantFilterModal');
+  if (existing) return existing;
+
+  const template = document.getElementById('restaurantFilterModalTemplate');
+  if (!(template instanceof HTMLTemplateElement)) return null;
+
+  const modalNode = template.content.firstElementChild?.cloneNode(true);
+  if (!(modalNode instanceof HTMLElement)) return null;
+
+  document.body.appendChild(modalNode);
+
+  initRestaurantFilterClear(modalNode);
+
+  if (typeof window.htmx !== 'undefined' && typeof window.htmx.process === 'function') {
+    window.htmx.process(modalNode);
+  }
+
+  modalNode.addEventListener('hidden.bs.modal', () => {
+    modalNode.remove();
+  });
+
+  return modalNode;
+}
+
+function openRestaurantFilterModal() {
+  const modalElement = ensureRestaurantFilterModal();
+  if (!modalElement) return;
+
+  syncRestaurantFilterFormFromUrl();
+
+  const modalInstance = new bootstrap.Modal(modalElement);
+  modalInstance.show();
+}
+
 function openRestaurantBulkDeleteModal(selectedIds) {
   const modalElement = document.getElementById('bulkDeleteRestaurantsModal');
   const countElement = modalElement?.querySelector('[data-restaurant-bulk-count]');
@@ -793,6 +826,22 @@ function initFaviconLoading() {
   }
 }
 
+function redistributeRestaurantChunkBuffer(container) {
+  if (!container || !container.classList?.contains('restaurant-chunk-buffer')) return;
+  const cardView = document.getElementById('card-view-container');
+  const cardsWrapper = container.querySelector('.restaurant-chunk-cards');
+  const sentinel = container.querySelector('.restaurant-load-more-sentinel');
+
+  if (cardView && cardsWrapper) {
+    const cols = cardsWrapper.querySelectorAll(':scope > .col');
+    cols.forEach((col) => cardView.appendChild(col));
+  }
+  if (sentinel && container.parentElement) {
+    container.parentElement.appendChild(sentinel);
+  }
+  container.remove();
+}
+
 let reapplyAfterHtmxScheduled = false;
 
 function scheduleReapplyAfterHtmx() {
@@ -813,14 +862,17 @@ function initHtmxIntegration() {
   function maybeReapply(event) {
     const target = event.detail?.target;
     if (target instanceof HTMLElement) {
-      if (target.id === 'restaurant-list-results' || target.querySelector?.('#restaurant-list-results')) {
-        scheduleReapplyAfterHtmx();
+      if (target.id === 'restaurant-list-chunk-target') {
+        const buffers = target.querySelectorAll(':scope > .restaurant-chunk-buffer');
+        buffers.forEach((buf) => redistributeRestaurantChunkBuffer(buf));
+        if (target.children.length > 0) {
+          scheduleReapplyAfterHtmx();
+        }
         return;
       }
-    }
-
-    if (document.getElementById('restaurant-list-results')) {
-      scheduleReapplyAfterHtmx();
+      if (target.id === 'restaurant-list-results' || target.querySelector?.('#restaurant-list-results')) {
+        scheduleReapplyAfterHtmx();
+      }
     }
   }
 
@@ -876,17 +928,26 @@ function init() {
   initPlacesTabLazyLoad();
   applyRestaurantSelectionState();
   initRestaurantCityToggles();
+  syncRestaurantFilterFormFromUrl();
   updateRestaurantFilterIndicators();
   scheduleRestaurantStickyOffsetUpdate();
 
+  const filterOpenButton = document.querySelector('[data-restaurant-filter-open]');
+  if (filterOpenButton) {
+    filterOpenButton.addEventListener('click', (event) => {
+      event.preventDefault();
+      openRestaurantFilterModal();
+    });
+  }
+
   window.addEventListener('popstate', () => {
     updateRestaurantFilterIndicators();
+    syncRestaurantFilterFormFromUrl();
   });
 
   window.addEventListener('resize', scheduleRestaurantStickyOffsetUpdate);
 
-  // Non-critical functionality that can be deferred
-  initFaviconLoading();
+  // Favicon: initial load handled by main.js; initFaviconLoading() runs after HTMX swap in scheduleReapplyAfterHtmx
 }
 
 // Initialize when DOM is ready (or immediately if already loaded, e.g. after HTMX swap)

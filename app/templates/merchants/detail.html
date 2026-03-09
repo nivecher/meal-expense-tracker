@@ -1,123 +1,419 @@
 {% extends "base.html" %} {% block title %}{{ merchant.name }} - Merchant - Meal Expense Tracker{% endblock %} {% block
-content %}
-<div class="row">
-    <div class="col-md-8">
-        <div class="card">
-            <div class="card-header d-flex justify-content-between align-items-center">
-                <h4 class="mb-0 d-flex align-items-center">
-                    <span class="me-2">
+content %} {% set merchant_summary = merchant_summary|default( { 'restaurant_count': 0, 'expense_count': 0,
+'total_amount': 0, 'avg_expense_amount': 0, 'last_expense_date': none, }, true ) %} {% set matching_restaurants =
+matching_restaurants|default([], true) %} {% set breadcrumb_items = [ {'url': url_for('main.index'), 'title':
+'Dashboard'}, {'url': url_for('merchants.list_merchants'), 'title': 'Merchants'}, {'title': merchant.name} ] %} {%
+include 'includes/breadcrumb.html' %}
+
+<div class="container py-4">
+    <div class="card shadow-sm mb-4">
+        <div class="card-body p-4">
+            <div class="row align-items-center g-3">
+                <div class="col-lg-8">
+                    <div class="d-flex align-items-center gap-3 mb-3">
+                        <div class="restaurant-icon flex-shrink-0">
+                            {% if merchant.favicon_url %}
+                            <img
+                                src="{{ url_for('static', filename='img/favicons/favicon-32x32.png') }}"
+                                data-favicon-url="{{ merchant.favicon_url }}"
+                                data-size="40"
+                                alt="{{ merchant.name }} icon"
+                                class="restaurant-favicon"
+                                width="40"
+                                height="40" />
+                            <i class="fas fa-building text-primary restaurant-fallback-icon d-none"></i>
+                            {% elif merchant.website %}
+                            <img
+                                src="{{ url_for('static', filename='img/favicons/favicon-32x32.png') }}"
+                                data-website="{{ merchant.website }}"
+                                data-size="40"
+                                alt="{{ merchant.name }} icon"
+                                class="restaurant-favicon"
+                                width="40"
+                                height="40" />
+                            <i class="fas fa-building text-primary restaurant-fallback-icon d-none"></i>
+                            {% else %}
+                            <i class="fas fa-building text-primary" style="font-size: 32px"></i>
+                            {% endif %}
+                        </div>
+                        <div>
+                            <h1 class="h3 mb-2">{{ merchant.name }}</h1>
+                            <div class="d-flex align-items-center flex-wrap gap-2">
+                                {% if merchant.service_level %}
+                                <span class="badge bg-info text-dark"
+                                    >Service: {{ merchant.service_level_display }}</span
+                                >
+                                {% endif %} {% if merchant.cuisine %}
+                                <span class="badge bg-light text-dark border">Cuisine: {{ merchant.cuisine }}</span>
+                                {% endif %}
+                                <span
+                                    class="badge {% if merchant.is_chain %}bg-primary-subtle text-primary border border-primary-subtle{% else %}bg-secondary-subtle text-secondary border border-secondary-subtle{% endif %}">
+                                    {{ 'Chain' if merchant.is_chain else 'Independent' }}
+                                </span>
+                                {% if merchant.menu_focus %}
+                                <span class="badge bg-secondary">Menu: {{ merchant.menu_focus }}</span>
+                                {% endif %} {% if merchant.category %}
+                                <span class="badge bg-light text-dark border"
+                                    >Format: {{ merchant.category_display }}</span
+                                >
+                                {% endif %} {% if merchant.short_name %}
+                                <span class="badge bg-secondary-subtle text-secondary border border-secondary-subtle">
+                                    Alias: {{ merchant.short_name }}
+                                </span>
+                                {% endif %} {% if merchant_summary.last_expense_date %}
+                                <span class="badge bg-success-subtle text-success border border-success-subtle">
+                                    Active {{ merchant_summary.last_expense_date|time_ago }}
+                                </span>
+                                {% endif %} {% if not merchant.is_chain and merchant_summary.restaurant_count > 1 %}
+                                <span class="badge bg-warning-subtle text-warning border border-warning-subtle">
+                                    Suggest Chain: {{ merchant_summary.restaurant_count }} locations linked
+                                </span>
+                                {% endif %} {% if matching_restaurants %}
+                                <span class="badge bg-warning text-dark">
+                                    {{ matching_restaurants|length }} matching restaurant{{ 's' if
+                                    matching_restaurants|length != 1 else '' }} ready to link
+                                </span>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    <div class="text-muted">
                         {% if merchant.website %}
-                        <img
-                            src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"
-                            data-website="{{ merchant.website }}"
-                            data-size="32"
-                            alt="{{ merchant.name }} icon"
-                            class="restaurant-favicon"
-                            width="32"
-                            height="32" />
-                        <i class="fas fa-building text-primary restaurant-fallback-icon d-none"></i>
+                        <div>
+                            <i class="fas fa-globe me-2"></i>
+                            <a
+                                href="{{ merchant.website }}"
+                                class="text-decoration-none"
+                                target="_blank"
+                                rel="noopener noreferrer">
+                                {{ merchant.website }}
+                            </a>
+                        </div>
                         {% else %}
-                        <i class="fas fa-building me-2"></i>
+                        <div>No website configured</div>
                         {% endif %}
-                    </span>
-                    {{ merchant.name }}
-                </h4>
-                <div>
-                    <a
-                        href="{{ url_for('merchants.edit_merchant', merchant_id=merchant.id) }}"
-                        class="btn btn-sm btn-outline-primary">
-                        <i class="fas fa-edit me-1"></i>Edit
-                    </a>
-                    <button
-                        class="btn btn-sm btn-outline-danger"
-                        data-delete-url="{{ url_for('merchants.delete_merchant', merchant_id=merchant.id) }}"
-                        data-merchant-name="{{ merchant.name }}">
-                        <i class="fas fa-trash me-1"></i>Delete
-                    </button>
+                    </div>
                 </div>
-            </div>
-            <div class="card-body">
-                <dl class="row">
-                    <dt class="col-sm-3">Category</dt>
-                    <dd class="col-sm-9">
-                        {% if merchant.category %}
-                        <span class="badge bg-secondary">{{ merchant.category|replace('_', ' ')|title }}</span>
-                        {% else %}
-                        <span class="text-muted">Not specified</span>
+                <div class="col-lg-4">
+                    <div class="d-flex flex-wrap gap-2 justify-content-lg-end">
+                        <a href="{{ url_for('merchants.list_merchants') }}" class="btn btn-outline-secondary">
+                            <i class="fas fa-arrow-left me-1"></i>Back to Merchants
+                        </a>
+                        <a
+                            href="{{ url_for('restaurants.add_restaurant', merchant_id=merchant.id, name=merchant.name, website=merchant.website or '', cuisine=merchant.cuisine or '', service_level=merchant.service_level or '', search_query=merchant.short_name or merchant.name) }}"
+                            class="btn btn-outline-secondary">
+                            <i class="fas fa-utensils me-1"></i>Add Restaurant
+                        </a>
+                        <a
+                            href="{{ url_for('merchants.review_restaurant_associations') }}"
+                            class="btn btn-outline-secondary">
+                            <i class="fas fa-link me-1"></i>Review Associations
+                        </a>
+                        {% if rewards_link %}
+                        <span
+                            class="btn btn-outline-secondary disabled border-0 text-warning"
+                            aria-disabled="true"
+                            title="Rewards program linked: {{ rewards_link.rewards_program.name }}">
+                            <i class="fas fa-award"></i>
+                        </span>
+                        <a
+                            href="{{ url_for('loyalty.view_rewards_program', program_id=rewards_link.rewards_program_id) }}"
+                            class="btn btn-outline-secondary">
+                            {% if rewards_link.rewards_program.website or rewards_link.rewards_program.portal_url %}
+                            <img
+                                src="{{ url_for('static', filename='img/favicons/favicon-32x32.png') }}"
+                                data-website="{{ rewards_link.rewards_program.website or rewards_link.rewards_program.portal_url }}"
+                                data-size="16"
+                                alt="{{ rewards_link.rewards_program.name }} icon"
+                                class="restaurant-favicon-table me-1"
+                                width="16"
+                                height="16" />
+                            <i class="fas fa-award text-warning restaurant-fallback-icon d-none me-1"></i>
+                            {% else %}
+                            <i class="fas fa-award text-warning me-1"></i>
+                            {% endif %} View Rewards
+                        </a>
                         {% endif %}
-                    </dd>
-
-                    <dt class="col-sm-3">Short Name</dt>
-                    <dd class="col-sm-9">
-                        {% if merchant.short_name %}
-                        <span class="fw-semibold">{{ merchant.short_name }}</span>
-                        {% else %}
-                        <span class="text-muted">Not specified</span>
-                        {% endif %}
-                    </dd>
-
-                    <dt class="col-sm-3">Website</dt>
-                    <dd class="col-sm-9">
-                        {% if merchant.website %}
-                        <a href="{{ merchant.website }}" class="text-decoration-none text-break"
-                            >{{ merchant.website }}</a
-                        >
-                        {% else %}
-                        <span class="text-muted">Not specified</span>
-                        {% endif %}
-                    </dd>
-
-                    <dt class="col-sm-3">Created</dt>
-                    <dd class="col-sm-9"
-                        >{{ merchant.created_at.strftime('%Y-%m-%d %H:%M') if merchant.created_at else 'N/A' }}</dd
-                    >
-
-                    <dt class="col-sm-3">Last Updated</dt>
-                    <dd class="col-sm-9"
-                        >{{ merchant.updated_at.strftime('%Y-%m-%d %H:%M') if merchant.updated_at else 'N/A' }}</dd
-                    >
-                </dl>
+                        <a
+                            href="{{ url_for('merchants.edit_merchant', merchant_id=merchant.id) }}"
+                            class="btn btn-outline-primary">
+                            <i class="fas fa-edit me-1"></i>Edit
+                        </a>
+                        <button
+                            class="btn btn-outline-danger"
+                            data-delete-url="{{ url_for('merchants.delete_merchant', merchant_id=merchant.id) }}"
+                            data-merchant-name="{{ merchant.name }}"
+                            data-linked-restaurant-count="{{ merchant_summary.restaurant_count }}">
+                            <i class="fas fa-trash me-1"></i>Delete
+                        </button>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
 
-    <div class="col-md-4">
-        <div class="card">
-            <div class="card-header">
-                <h5 class="mb-0">Restaurants</h5>
-            </div>
-            <div class="card-body">
-                {% if restaurants %}
-                <div class="list-group list-group-flush">
-                    {% for restaurant in restaurants %}
-                    <a
-                        href="{{ url_for('restaurants.restaurant_details', restaurant_id=restaurant.id) }}"
-                        class="list-group-item list-group-item-action">
-                        <div class="d-flex justify-content-between align-items-start">
-                            <div>
-                                <div class="fw-semibold">{{ restaurant.display_name }}</div>
-                                <small class="text-muted"
-                                    >{{ restaurant|restaurant_address_only|replace('\n', ', ') }}</small
-                                >
-                            </div>
-                        </div>
-                    </a>
-                    {% endfor %}
+    <div class="row g-3 mb-4">
+        <div class="col-sm-6 col-xl-3">
+            <div class="card h-100 shadow-sm">
+                <div class="card-body">
+                    <div class="text-muted small text-uppercase">Restaurants</div>
+                    <div class="h3 mb-0">{{ merchant_summary.restaurant_count }}</div>
                 </div>
-                {% else %}
-                <p class="text-muted mb-2"> <i class="fas fa-utensils me-2"></i>No restaurants linked yet. </p>
-                {% endif %}
-                <a
-                    href="{{ url_for('restaurants.list_restaurants') }}?merchant_id={{ merchant.id }}"
-                    class="btn btn-sm btn-outline-primary mt-3">
-                    <i class="fas fa-list me-1"></i>View Restaurants
-                </a>
+            </div>
+        </div>
+        <div class="col-sm-6 col-xl-3">
+            <div class="card h-100 shadow-sm">
+                <div class="card-body">
+                    <div class="text-muted small text-uppercase">Expenses</div>
+                    <div class="h3 mb-0">{{ merchant_summary.expense_count }}</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-sm-6 col-xl-3">
+            <div class="card h-100 shadow-sm">
+                <div class="card-body">
+                    <div class="text-muted small text-uppercase">Total Spend</div>
+                    <div class="h5 mb-0">{{ merchant_summary.total_amount|format_currency_usd }}</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-sm-6 col-xl-3">
+            <div class="card h-100 shadow-sm">
+                <div class="card-body">
+                    <div class="text-muted small text-uppercase">Average Expense</div>
+                    <div class="h5 mb-0">{{ merchant_summary.avg_expense_amount|format_currency_usd }}</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-4">
+        <div class="col-lg-8">
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-white">
+                    <h5 class="mb-0"> <i class="fas fa-info-circle me-2 text-primary"></i>Merchant Information </h5>
+                </div>
+                <div class="card-body">
+                    <dl class="row mb-0">
+                        <dt class="col-sm-3">Service Level</dt>
+                        <dd class="col-sm-9">
+                            {% if merchant.service_level %}
+                            <span class="badge bg-info text-dark">{{ merchant.service_level_display }}</span>
+                            {% else %}
+                            <span class="text-muted">Not specified</span>
+                            {% endif %}
+                        </dd>
+
+                        <dt class="col-sm-3">Cuisine</dt>
+                        <dd class="col-sm-9">
+                            {% if merchant.cuisine %}
+                            <span class="fw-semibold">{{ merchant.cuisine }}</span>
+                            {% else %}
+                            <span class="text-muted">Not specified</span>
+                            {% endif %}
+                        </dd>
+
+                        <dt class="col-sm-3">Menu Focus</dt>
+                        <dd class="col-sm-9">
+                            {% if merchant.menu_focus %}
+                            <span class="badge bg-secondary">{{ merchant.menu_focus }}</span>
+                            {% else %}
+                            <span class="text-muted">Not specified</span>
+                            {% endif %}
+                        </dd>
+
+                        <dt class="col-sm-3">Format</dt>
+                        <dd class="col-sm-9">
+                            {% if merchant.category %}
+                            <span class="badge bg-light text-dark border">{{ merchant.category_display }}</span>
+                            {% else %}
+                            <span class="text-muted">Not specified</span>
+                            {% endif %}
+                        </dd>
+
+                        <dt class="col-sm-3">Short Name</dt>
+                        <dd class="col-sm-9">
+                            {% if merchant.short_name %}
+                            <span class="fw-semibold">{{ merchant.short_name }}</span>
+                            {% else %}
+                            <span class="text-muted">Not specified</span>
+                            {% endif %}
+                        </dd>
+
+                        <dt class="col-sm-3">Website</dt>
+                        <dd class="col-sm-9">
+                            {% if merchant.website %}
+                            <a
+                                href="{{ merchant.website }}"
+                                class="text-decoration-none text-break"
+                                target="_blank"
+                                rel="noopener noreferrer">
+                                {{ merchant.website }}
+                            </a>
+                            {% else %}
+                            <span class="text-muted">Not specified</span>
+                            {% endif %}
+                        </dd>
+
+                        <dt class="col-sm-3">Rewards</dt>
+                        <dd class="col-sm-9">
+                            {% if rewards_link %}
+                            <i class="fas fa-award text-warning me-1"></i>
+                            <a
+                                href="{{ url_for('loyalty.view_rewards_program', program_id=rewards_link.rewards_program_id) }}"
+                                class="text-decoration-none">
+                                {{ rewards_link.rewards_program.name }}
+                            </a>
+                            {% else %}
+                            <span class="text-muted">Not linked</span>
+                            {% endif %}
+                        </dd>
+
+                        <dt class="col-sm-3">Description</dt>
+                        <dd class="col-sm-9">
+                            {% if merchant.description %}
+                            <span class="text-break">{{ merchant.description }}</span>
+                            {% else %}
+                            <span class="text-muted">Not specified</span>
+                            {% endif %}
+                        </dd>
+
+                        <dt class="col-sm-3">Created</dt>
+                        <dd class="col-sm-9"
+                            >{{ merchant.created_at.strftime('%Y-%m-%d %H:%M') if merchant.created_at else 'N/A' }}</dd
+                        >
+
+                        <dt class="col-sm-3">Last Updated</dt>
+                        <dd class="col-sm-9"
+                            >{{ merchant.updated_at.strftime('%Y-%m-%d %H:%M') if merchant.updated_at else 'N/A' }}</dd
+                        >
+
+                        <dt class="col-sm-3">Last Expense</dt>
+                        <dd class="col-sm-9">
+                            {% if merchant_summary.last_expense_date %}
+                            <span
+                                data-bs-toggle="tooltip"
+                                title="{{ merchant_summary.last_expense_date.strftime('%B %d, %Y') }}">
+                                {{ merchant_summary.last_expense_date|time_ago }}
+                            </span>
+                            {% else %}
+                            <span class="text-muted">No expenses yet</span>
+                            {% endif %}
+                        </dd>
+                    </dl>
+                </div>
+            </div>
+
+            <div class="card shadow-sm">
+                <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0"> <i class="fas fa-utensils me-2 text-primary"></i>Linked Restaurants </h5>
+                    <a href="{{ url_for('restaurants.add_restaurant') }}" class="btn btn-sm btn-outline-primary">
+                        <i class="fas fa-plus me-1"></i>Add Restaurant
+                    </a>
+                </div>
+                <div class="card-body">
+                    {% if restaurants %}
+                    <div class="list-group list-group-flush">
+                        {% for restaurant_entry in restaurants %} {% set restaurant = restaurant_entry.restaurant if
+                        restaurant_entry.restaurant is defined else restaurant_entry %}
+                        <a
+                            href="{{ url_for('restaurants.restaurant_details', restaurant_id=restaurant.id) }}"
+                            class="list-group-item list-group-item-action px-0">
+                            <div class="d-flex justify-content-between align-items-start gap-3">
+                                <div>
+                                    <div class="fw-semibold">{{ restaurant.display_name }}</div>
+                                    <small class="text-muted"
+                                        >{{ restaurant|restaurant_address_only|replace('\n', ', ') }}</small
+                                    >
+                                </div>
+                                <div class="text-end small text-muted">
+                                    {% set expense_count = restaurant_entry.expense_count|default(0) %} {% set
+                                    total_amount = restaurant_entry.total_amount|default(0) %} {% set last_expense_date
+                                    = restaurant_entry.last_expense_date|default(none) %}
+                                    <div>{{ expense_count }} expense{{ 's' if expense_count != 1 else '' }}</div>
+                                    <div class="fw-semibold text-success">{{ total_amount|format_currency_usd }}</div>
+                                    {% if last_expense_date %}
+                                    <div>Last: {{ last_expense_date|time_ago }}</div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </a>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <div class="text-center py-4">
+                        <p class="text-muted mb-3"> <i class="fas fa-utensils me-2"></i>No restaurants linked yet. </p>
+                        <a href="{{ url_for('restaurants.add_restaurant') }}" class="btn btn-primary">
+                            <i class="fas fa-plus me-1"></i>Add Restaurant
+                        </a>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-4">
+            <div class="card shadow-sm">
+                <div class="card-header bg-white">
+                    <h5 class="mb-0"> <i class="fas fa-link me-2 text-primary"></i>Association Review </h5>
+                </div>
+                <div class="card-body">
+                    {% if matching_restaurants %}
+                    <h6 class="mb-2">Unlinked Matches</h6>
+                    <p class="text-muted small mb-3">
+                        These restaurants appear to match this merchant by current matching rules.
+                    </p>
+                    <form
+                        method="post"
+                        action="{{ url_for('merchants.associate_matching_restaurants', merchant_id=merchant.id) }}">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+                        <div class="list-group list-group-flush mb-3">
+                            {% for restaurant in matching_restaurants %}
+                            <label class="list-group-item d-flex align-items-start gap-2 px-0">
+                                <input
+                                    type="checkbox"
+                                    class="form-check-input mt-1"
+                                    name="restaurant_ids"
+                                    value="{{ restaurant.id }}"
+                                    checked />
+                                <span>
+                                    <span class="fw-semibold d-block">{{ restaurant.name }}</span>
+                                    <small class="text-muted">{{ restaurant.city or "City not set" }}</small>
+                                </span>
+                            </label>
+                            {% endfor %}
+                        </div>
+                        <button type="submit" class="btn btn-outline-success w-100">
+                            <i class="fas fa-link me-1"></i>Link Selected Matches
+                        </button>
+                    </form>
+                    {% else %}
+                    <p class="text-muted mb-3">No unlinked matching restaurants were found for this merchant.</p>
+                    <a
+                        href="{{ url_for('merchants.review_restaurant_associations') }}"
+                        class="btn btn-outline-secondary w-100">
+                        <i class="fas fa-link me-1"></i>Review All Associations
+                    </a>
+                    {% endif %}
+
+                    <hr />
+
+                    <div class="d-grid gap-2">
+                        <a href="{{ url_for('merchants.list_merchants') }}" class="btn btn-outline-secondary">
+                            <i class="fas fa-arrow-left me-1"></i>Back to Merchants
+                        </a>
+                        <a
+                            href="{{ url_for('restaurants.list_restaurants', merchant_status='unlinked') }}"
+                            class="btn btn-outline-secondary">
+                            <i class="fas fa-utensils me-1"></i>View Unlinked Restaurants
+                        </a>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
 </div>
 
-<!-- Delete Confirmation Modal -->
 <div class="modal fade" id="deleteMerchantModal" tabindex="-1" aria-labelledby="deleteMerchantModalLabel">
     <div class="modal-dialog">
         <div class="modal-content">
@@ -133,9 +429,14 @@ content %}
             </div>
             <div class="modal-body">
                 <p>Are you sure you want to delete <strong id="merchantName"></strong>?</p>
+                <p class="mb-2">
+                    <strong id="merchantLinkedRestaurantCount">0</strong> linked restaurant(s) will be unassigned and
+                    kept.
+                </p>
                 <p class="text-danger">
                     <i class="fas fa-exclamation-circle me-2"></i>
-                    This will unlink all restaurants from this merchant. This action cannot be undone.
+                    The merchant will be deleted. Linked restaurants and expenses will not be deleted. This action
+                    cannot be undone.
                 </p>
             </div>
             <div class="modal-footer">
@@ -161,8 +462,10 @@ content %}
                 e.preventDefault();
                 var url = this.getAttribute("data-delete-url");
                 var name = this.getAttribute("data-merchant-name");
+                var linkedRestaurantCount = this.getAttribute("data-linked-restaurant-count") || "0";
 
                 document.getElementById("merchantName").textContent = name;
+                document.getElementById("merchantLinkedRestaurantCount").textContent = linkedRestaurantCount;
                 document.getElementById("deleteMerchantForm").action = url;
 
                 var modal = new bootstrap.Modal(document.getElementById("deleteMerchantModal"));
@@ -192,7 +495,7 @@ content %}
                             alert(data.message || "Failed to delete merchant");
                         }
                     })
-                    .catch(function (error) {
+                    .catch(function () {
                         alert("An error occurred. Please try again.");
                     });
             });

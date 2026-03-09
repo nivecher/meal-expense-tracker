@@ -12,8 +12,10 @@ from app.expenses.cli import (
     _process_users,
     _show_results,
     _sort_categories_by_default_order,
+    backfill_receipts,
     category_cli,
     list_categories,
+    receipt_cli,
     register_commands,
     reinit_categories,
 )
@@ -70,10 +72,40 @@ class TestExpensesCLI:
         assert category_cli.name == "category"
         assert category_cli.help == "Category management commands."
 
+    def test_receipt_cli_group(self) -> None:
+        """Test receipt CLI group creation."""
+        assert receipt_cli.name == "receipt"
+        assert receipt_cli.help == "Receipt maintenance commands."
+
     def test_register_commands(self, app) -> None:
         """Test command registration."""
         register_commands(app)
         assert "category" in [cmd.name for cmd in app.cli.commands.values()]
+        assert "receipt" in [cmd.name for cmd in app.cli.commands.values()]
+
+    def test_backfill_receipts_dry_run(self, app) -> None:
+        """Test receipt backfill dry-run output."""
+        test_app = app
+        register_commands(test_app)
+        cli_runner = test_app.test_cli_runner()
+
+        with test_app.app_context():
+            with patch("app.expenses.cli.Expense") as mock_expense_class:
+                mock_expense = Mock()
+                mock_expense.id = 1
+                mock_expense.user_id = 1
+                mock_expense.receipt_image = "receipts/example.png"
+                mock_query = Mock()
+                mock_filter = Mock()
+                mock_filter.order_by.return_value.all.return_value = [mock_expense]
+                mock_query.filter.return_value = mock_filter
+                mock_expense_class.query = mock_query
+
+                with patch("app.expenses.services._get_receipt_record_for_expense", return_value=None):
+                    result = cli_runner.invoke(backfill_receipts, ["--dry-run"])
+
+        assert result.exit_code == 0
+        assert "Would create 1 structured receipt row" in result.output
 
     def test_sort_categories_by_default_order(self, app, mock_category) -> None:
         """Test sorting categories by default order."""

@@ -4,7 +4,7 @@ import csv
 import io
 from typing import Any, Dict, List, Optional, Tuple
 
-from sqlalchemy import case, func, or_, select
+from sqlalchemy import and_, case, func, inspect, not_, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.sql import Select
 from werkzeug.datastructures import FileStorage
@@ -12,13 +12,16 @@ from werkzeug.datastructures import FileStorage
 from app.constants.cuisines import format_cuisine_type
 from app.expenses.models import Category, Expense
 from app.extensions import db
+from app.merchants.models import Merchant
 from app.restaurants.exceptions import (
     DuplicateGooglePlaceIdError,
     DuplicateRestaurantError,
 )
 from app.restaurants.models import Restaurant
 from app.utils.geo_utils import calculate_distance_km, validate_coordinates
+from app.utils.phone_utils import normalize_phone_for_storage
 from app.utils.service_level_detector import ServiceLevel, ServiceLevelDetector
+from app.utils.url_utils import canonicalize_website_for_storage
 
 
 def normalize_service_level_value(value: str) -> str | None:
@@ -75,9 +78,17 @@ def normalize_service_level_value(value: str) -> str | None:
         return ServiceLevel.FAST_CASUAL.value
     elif "quick" in value_lower or "takeout" in value_lower or "drive" in value_lower:
         return ServiceLevel.QUICK_SERVICE.value
-
-    # Return None for invalid values (will be handled by validation)
     return None
+
+
+def _normalize_google_place_id(value: Any) -> str | None:
+    """Normalize blank Google Place IDs to None for uniqueness handling."""
+    if value is None:
+        return None
+    if not isinstance(value, str):
+        value = str(value)
+    normalized = value.strip()
+    return normalized or None
 
 
 def recalculate_restaurant_statistics(user_id: int) -> None:
@@ -145,11 +156,32 @@ def get_restaurant_filters(args: dict[str, Any]) -> dict[str, Any]:
         "service_level": args.get("service_level", "").strip(),
         "city": args.get("city", "").strip(),
         "is_chain": args.get("is_chain", "").strip(),
+        "merchant_status": args.get("merchant_status", "").strip(),
+        "missing_location_name": args.get("missing_location_name", "").strip(),
         "rating_min": args.get("rating_min", "").strip(),
         "rating_max": args.get("rating_max", "").strip(),
         "sort_by": args.get("sort", "name"),
         "sort_order": args.get("order", "asc"),
     }
+
+
+def _location_name_present_expression() -> Any:
+    """Return SQL expression indicating a meaningful location name is present."""
+    trimmed_location_name = func.trim(func.coalesce(Restaurant.location_name, ""))
+    lowered_location_name = func.lower(trimmed_location_name)
+    return and_(
+        trimmed_location_name != "",
+        not_(lowered_location_name.in_(["none", "null", "n/a", "na"])),
+    )
+
+
+def _needs_location_name_expression() -> Any:
+    """Return SQL expression for chain-linked restaurants missing a location name."""
+    return and_(
+        Restaurant.merchant_id.is_not(None),
+        Merchant.is_chain.is_(True),
+        not_(_location_name_present_expression()),
+    )
 
 
 def get_restaurants_with_stats(user_id: int, args: dict[str, Any]) -> tuple[list, dict]:
@@ -169,6 +201,12 @@ def get_restaurants_with_stats(user_id: int, args: dict[str, Any]) -> tuple[list
     stmt = (
         select(
             Restaurant,
+            func.max(Merchant.name).label("merchant_name"),
+            func.max(Merchant.short_name).label("merchant_short_name"),
+            func.max(Merchant.category).label("merchant_category"),
+            func.max(Merchant.website).label("merchant_website"),
+            func.max(Merchant.favicon_url).label("merchant_favicon_url"),
+            func.max(case((_needs_location_name_expression(), 1), else_=0)).label("needs_location_name_flag"),
             func.count(Expense.id).label("visit_count"),
             func.coalesce(func.sum(Expense.amount), 0).label("total_spent"),
             func.max(Expense.date).label("last_visit"),
@@ -187,6 +225,7 @@ def get_restaurants_with_stats(user_id: int, args: dict[str, Any]) -> tuple[list
             Expense,
             (Expense.restaurant_id == Restaurant.id) & (Expense.user_id == user_id),
         )
+        .outerjoin(Merchant, Merchant.id == Restaurant.merchant_id)
         .where(Restaurant.user_id == user_id)
         .group_by(Restaurant.id)
     )
@@ -212,6 +251,13 @@ def get_restaurants_with_stats(user_id: int, args: dict[str, Any]) -> tuple[list
         restaurant["display_name"] = restaurant_obj.display_name
         restaurant["address_line_1"] = restaurant_obj.address_line_1
         restaurant["address_line_2"] = restaurant_obj.address_line_2
+        restaurant["merchant_name"] = row.merchant_name
+        restaurant["merchant_short_name"] = row.merchant_short_name
+        restaurant["merchant_category"] = row.merchant_category
+        restaurant["merchant_website"] = row.merchant_website
+        restaurant["merchant_favicon_url"] = row.merchant_favicon_url
+        restaurant["merchant_is_chain"] = bool(restaurant_obj.merchant.is_chain) if restaurant_obj.merchant else False
+        restaurant["needs_location_name_cta"] = bool(row.needs_location_name_flag)
         # Add the aggregated fields
         restaurant.update(
             {
@@ -224,6 +270,9 @@ def get_restaurants_with_stats(user_id: int, args: dict[str, Any]) -> tuple[list
         restaurants.append(restaurant)
 
     total_restaurants = len(restaurants)
+    linked_restaurants = sum(1 for r in restaurants if r.get("merchant_id"))
+    unlinked_restaurants = total_restaurants - linked_restaurants
+    missing_location_name_restaurants = sum(1 for r in restaurants if r.get("needs_location_name_cta"))
     total_visits = sum(r.get("visit_count", 0) for r in restaurants)
     total_spent = sum(r.get("total_spent", 0) for r in restaurants)
 
@@ -233,11 +282,137 @@ def get_restaurants_with_stats(user_id: int, args: dict[str, Any]) -> tuple[list
 
     stats = {
         "total_restaurants": total_restaurants,
+        "linked_restaurants": linked_restaurants,
+        "unlinked_restaurants": unlinked_restaurants,
+        "missing_location_name_restaurants": missing_location_name_restaurants,
         "total_visits": total_visits,
         "total_spent": total_spent,
         "avg_price_per_person": overall_avg_price_per_person,
     }
     return restaurants, stats
+
+
+# Default and max chunk size for infinite-scroll list
+RESTAURANT_LIST_PAGE_SIZE = 25
+RESTAURANT_LIST_PAGE_SIZE_MAX = 100
+
+
+def get_restaurants_with_stats_paginated(
+    user_id: int,
+    args: dict[str, Any],
+    offset: int = 0,
+    limit: int = RESTAURANT_LIST_PAGE_SIZE,
+) -> tuple[list[dict[str, Any]], int, dict[str, Any]]:
+    """
+    Get a page of restaurants with stats (SQL-level pagination).
+
+    Returns:
+        (restaurants_page, total_count, stats)
+    """
+    filters = get_restaurant_filters(args)
+    stmt = (
+        select(
+            Restaurant,
+            func.max(Merchant.name).label("merchant_name"),
+            func.max(Merchant.short_name).label("merchant_short_name"),
+            func.max(Merchant.category).label("merchant_category"),
+            func.max(Merchant.website).label("merchant_website"),
+            func.max(Merchant.favicon_url).label("merchant_favicon_url"),
+            func.max(Restaurant.merchant_id).label("merchant_id_for_stats"),
+            func.max(case((_needs_location_name_expression(), 1), else_=0)).label("needs_location_name_flag"),
+            func.count(Expense.id).label("visit_count"),
+            func.coalesce(func.sum(Expense.amount), 0).label("total_spent"),
+            func.max(Expense.date).label("last_visit"),
+            func.coalesce(
+                case(
+                    (
+                        func.sum(Expense.party_size).isnot(None) & (func.sum(Expense.party_size) > 0),
+                        func.sum(Expense.amount) / func.sum(Expense.party_size),
+                    ),
+                    else_=None,
+                ),
+                0,
+            ).label("avg_price_per_person"),
+        )
+        .outerjoin(
+            Expense,
+            (Expense.restaurant_id == Restaurant.id) & (Expense.user_id == user_id),
+        )
+        .outerjoin(Merchant, Merchant.id == Restaurant.merchant_id)
+        .where(Restaurant.user_id == user_id)
+        .group_by(Restaurant.id)
+    )
+    stmt = apply_restaurant_filters(stmt, filters)
+    stmt = apply_restaurant_sorting(stmt, filters["sort_by"], filters["sort_order"])
+
+    count_stmt = select(func.count()).select_from(stmt.subquery())
+    total_count = db.session.execute(count_stmt).scalar_one() or 0
+
+    subq = stmt.subquery()
+    stats_row = db.session.execute(
+        select(
+            func.coalesce(func.sum(subq.c.total_spent), 0).label("total_spent"),
+            func.coalesce(func.sum(subq.c.visit_count), 0).label("total_visits"),
+            func.sum(case((subq.c.merchant_id_for_stats.is_not(None), 1), else_=0)).label("linked_restaurants"),
+            func.coalesce(func.sum(subq.c.needs_location_name_flag), 0).label("missing_location_name_restaurants"),
+        ).select_from(subq)
+    ).one_or_none()
+    if stats_row:
+        total_spent = float(stats_row.total_spent or 0)
+        total_visits = int(stats_row.total_visits or 0)
+        linked = int(stats_row.linked_restaurants or 0)
+        unlinked = total_count - linked
+        missing_location_name_restaurants = int(stats_row.missing_location_name_restaurants or 0)
+        avg_prices = []  # per-restaurant avg; we don't have it in stats_row
+        overall_avg = sum(avg_prices) / len(avg_prices) if avg_prices else 0.0
+    else:
+        total_spent = 0.0
+        total_visits = 0
+        linked = 0
+        unlinked = total_count
+        missing_location_name_restaurants = 0
+        overall_avg = 0.0
+
+    stats = {
+        "total_restaurants": total_count,
+        "linked_restaurants": linked,
+        "unlinked_restaurants": unlinked,
+        "missing_location_name_restaurants": missing_location_name_restaurants,
+        "total_visits": total_visits,
+        "total_spent": total_spent,
+        "avg_price_per_person": overall_avg,
+    }
+
+    stmt = stmt.limit(limit).offset(offset)
+    results = db.session.execute(stmt).all()
+
+    restaurants = []
+    for row in results:
+        restaurant_obj = row[0]
+        restaurant = restaurant_obj.__dict__.copy()
+        restaurant.pop("_sa_instance_state", None)
+        restaurant["address"] = restaurant_obj.address
+        restaurant["display_name"] = restaurant_obj.display_name
+        restaurant["address_line_1"] = restaurant_obj.address_line_1
+        restaurant["address_line_2"] = restaurant_obj.address_line_2
+        restaurant["merchant_name"] = row.merchant_name
+        restaurant["merchant_short_name"] = row.merchant_short_name
+        restaurant["merchant_category"] = row.merchant_category
+        restaurant["merchant_website"] = row.merchant_website
+        restaurant["merchant_favicon_url"] = row.merchant_favicon_url
+        restaurant["merchant_is_chain"] = bool(restaurant_obj.merchant.is_chain) if restaurant_obj.merchant else False
+        restaurant["needs_location_name_cta"] = bool(row.needs_location_name_flag)
+        restaurant.update(
+            {
+                "visit_count": row.visit_count,
+                "total_spent": float(row.total_spent) if row.total_spent else 0.0,
+                "last_visit": row.last_visit,
+                "avg_price_per_person": (float(row.avg_price_per_person) if row.avg_price_per_person else 0.0),
+            }
+        )
+        restaurants.append(restaurant)
+
+    return restaurants, total_count, stats
 
 
 def _apply_search_filter(stmt: Select, search_term: str) -> Select:
@@ -303,7 +478,16 @@ def apply_restaurant_filters(stmt: Select, filters: dict[str, Any]) -> Select:
 
     if filters["is_chain"]:
         is_chain_value = filters["is_chain"].lower() == "true"
-        stmt = stmt.where(Restaurant.is_chain == is_chain_value)
+        stmt = stmt.where(Restaurant.merchant.has(Merchant.is_chain == is_chain_value))
+
+    merchant_status = filters.get("merchant_status", "")
+    if merchant_status == "linked":
+        stmt = stmt.where(Restaurant.merchant_id.is_not(None))
+    elif merchant_status == "unlinked":
+        stmt = stmt.where(Restaurant.merchant_id.is_(None))
+
+    if filters.get("missing_location_name", "").lower() == "true":
+        stmt = stmt.where(_needs_location_name_expression())
 
     # Apply rating filters
     stmt = _apply_rating_filters(stmt, filters["rating_min"], filters["rating_max"])
@@ -531,7 +715,7 @@ def create_restaurant(user_id: int, form: Any) -> tuple[Restaurant, bool]:
     """
     # Get form data
     google_place_id = getattr(form, "google_place_id", None)
-    google_place_id_value = google_place_id.data if google_place_id else None
+    google_place_id_value = _normalize_google_place_id(google_place_id.data if google_place_id else None)
     name = form.name.data
     city = form.city.data
 
@@ -541,6 +725,21 @@ def create_restaurant(user_id: int, form: Any) -> tuple[Restaurant, bool]:
     # Create new restaurant
     restaurant = Restaurant(user_id=user_id)
     form.populate_obj(restaurant)
+    restaurant.google_place_id = _normalize_google_place_id(restaurant.google_place_id)
+    restaurant.phone = normalize_phone_for_storage(restaurant.phone)
+    if restaurant.merchant_id is None:
+        from app.merchants.services import find_merchant_for_restaurant
+
+        matched_merchant = find_merchant_for_restaurant(
+            restaurant_name=restaurant.name or "",
+            website=restaurant.website,
+        )
+        if matched_merchant:
+            restaurant.merchant_id = matched_merchant.id
+
+    # Merchant dimensions can backfill restaurant attributes when the restaurant lacks them.
+    _apply_merchant_service_level(restaurant)
+    _apply_merchant_cuisine(restaurant)
 
     # Handle service level auto-detection
     _auto_detect_service_level(restaurant)
@@ -555,9 +754,10 @@ def create_restaurant(user_id: int, form: Any) -> tuple[Restaurant, bool]:
         return restaurant, True
     except IntegrityError as e:
         db.session.rollback()
-        # Reset session state to avoid PendingRollbackError
-        # This is necessary because after rollback, the session is in an invalid state
-        db.session.expunge_all()  # Remove all objects from session
+        # Rollback resets the failed transaction. Only detach the failed
+        # restaurant so unrelated objects like current_user stay session-bound.
+        if inspect(restaurant).session is db.session:
+            db.session.expunge(restaurant)
 
         # Handle database constraint violations
         if "uix_restaurant_google_place_id_user" in str(e.orig):
@@ -596,7 +796,7 @@ def _process_form_data_for_update(form: Any) -> dict[str, Any]:
     """
     form_data: dict[str, Any] = {}
     numeric_fields = {"rating", "latitude", "longitude"}
-    boolean_fields = {"is_chain"}
+    boolean_fields: set[str] = set()
 
     for field in form:
         if field.name in numeric_fields:
@@ -611,6 +811,15 @@ def _process_form_data_for_update(form: Any) -> dict[str, Any]:
         elif field.name in boolean_fields:
             # Ensure boolean fields are properly converted
             form_data[field.name] = bool(field.data) if field.data is not None else False
+        elif field.name == "website":
+            from app.utils.url_utils import canonicalize_website_for_storage
+
+            raw = field.data if field.data is not None else ""
+            form_data[field.name] = canonicalize_website_for_storage(raw) if raw else ""
+        elif field.name == "phone":
+            form_data[field.name] = normalize_phone_for_storage(field.data)
+        elif field.name == "google_place_id":
+            form_data[field.name] = _normalize_google_place_id(field.data)
         else:
             # For all other fields, use the value as is or empty string
             form_data[field.name] = field.data if field.data is not None else ""
@@ -672,6 +881,10 @@ def update_restaurant(restaurant_id: int, user_id: int, form: Any) -> Restaurant
     # Apply form data to restaurant
     _apply_form_data_to_restaurant(restaurant, form_data)
 
+    # Merchant dimensions can backfill restaurant attributes when the restaurant lacks them.
+    _apply_merchant_service_level(restaurant)
+    _apply_merchant_cuisine(restaurant)
+
     # Handle service level auto-detection for updates
     _auto_detect_service_level(restaurant)
 
@@ -684,8 +897,9 @@ def update_restaurant(restaurant_id: int, user_id: int, form: Any) -> Restaurant
         return restaurant
     except IntegrityError as e:
         db.session.rollback()
-        # Reset session state to avoid PendingRollbackError
-        db.session.expunge_all()
+        # Keep unrelated loaded objects attached to the session.
+        if inspect(restaurant).session is db.session:
+            db.session.expunge(restaurant)
 
         # Handle database constraint violations
         if "uix_restaurant_google_place_id_user" in str(e.orig):
@@ -857,7 +1071,7 @@ def _process_restaurant_row(row: dict, user_id: int) -> tuple[bool, str, Restaur
             country=row.get("country", "").strip() or None,
             phone=row.get("phone", "").strip() or None,
             email=row.get("email", "").strip() or None,
-            website=row.get("website", "").strip() or None,
+            website=canonicalize_website_for_storage(row.get("website", "").strip() or None),
             cuisine=row.get("cuisine", "").strip() or None,
             service_level=service_level_normalized,
             rating=safe_import_float(row.get("rating")),
@@ -865,10 +1079,18 @@ def _process_restaurant_row(row: dict, user_id: int) -> tuple[bool, str, Restaur
             primary_type=row.get("primary_type", "").strip() or None,
             latitude=safe_import_float(row.get("latitude")),
             longitude=safe_import_float(row.get("longitude")),
-            is_chain=safe_import_bool(row.get("is_chain")),
             google_place_id=google_place_id,
             notes=row.get("notes", "").strip() or None,
         )
+        if restaurant.merchant_id is None:
+            from app.merchants.services import find_merchant_for_restaurant
+
+            matched_merchant = find_merchant_for_restaurant(
+                restaurant_name=restaurant.name or "",
+                website=restaurant.website,
+            )
+            if matched_merchant:
+                restaurant.merchant_id = matched_merchant.id
         return True, "", restaurant
 
     except Exception as e:
@@ -1163,6 +1385,7 @@ def export_restaurants_for_user(
         {
             "name": r.name or "",
             "location_name": r.location_name or "",
+            "located_within": r.located_within or "",
             "address": r.address or "",
             "city": r.city or "",
             "state": r.state or "",
@@ -1178,7 +1401,6 @@ def export_restaurants_for_user(
             "primary_type": r.primary_type or "",
             "latitude": safe_float(r.latitude) if r.latitude is not None else "",
             "longitude": safe_float(r.longitude) if r.longitude is not None else "",
-            "is_chain": bool(r.is_chain) if r.is_chain is not None else "",
             "google_place_id": r.google_place_id or "",
             "notes": r.notes or "",
             "created_at": r.created_at.isoformat() if r.created_at else "",
@@ -1231,8 +1453,8 @@ def create_restaurant_for_user(user_id: int, data: dict[str, Any]) -> Restaurant
         country=data.get("country"),
         phone=data.get("phone"),
         email=data.get("email"),
-        website=data.get("website"),
-        google_place_id=data.get("google_place_id"),
+        website=canonicalize_website_for_storage(data.get("website")) if data.get("website") else None,
+        google_place_id=_normalize_google_place_id(data.get("google_place_id")),
         cuisine=data.get("cuisine"),
         service_level=data.get("service_level"),
         rating=data.get("rating"),
@@ -1240,9 +1462,20 @@ def create_restaurant_for_user(user_id: int, data: dict[str, Any]) -> Restaurant
         primary_type=data.get("primary_type"),
         latitude=data.get("latitude"),
         longitude=data.get("longitude"),
-        is_chain=data.get("is_chain", False),
         notes=data.get("notes"),
     )
+    if restaurant.merchant_id is None:
+        from app.merchants.services import find_merchant_for_restaurant
+
+        matched_merchant = find_merchant_for_restaurant(
+            restaurant_name=restaurant.name or "",
+            website=restaurant.website,
+        )
+        if matched_merchant:
+            restaurant.merchant_id = matched_merchant.id
+
+    _apply_merchant_service_level(restaurant)
+    _apply_merchant_cuisine(restaurant)
 
     db.session.add(restaurant)
     db.session.commit()
@@ -1285,13 +1518,20 @@ def update_restaurant_for_user(restaurant: Restaurant, data: dict[str, Any]) -> 
         "primary_type",
         "latitude",
         "longitude",
-        "is_chain",
         "notes",
     ]
 
     for field in updateable_fields:
         if field in data:
-            setattr(restaurant, field, data[field])
+            value = data[field]
+            if field == "website" and value:
+                value = canonicalize_website_for_storage(value) or value
+            elif field == "google_place_id":
+                value = _normalize_google_place_id(value)
+            setattr(restaurant, field, value)
+
+    _apply_merchant_service_level(restaurant)
+    _apply_merchant_cuisine(restaurant)
 
     db.session.commit()
 
@@ -1471,6 +1711,66 @@ def validate_restaurant_service_level(
         )
 
     return False, "", None
+
+
+# Legacy fallback: map merchant format category to restaurant service_level when service_level is absent.
+_MERCHANT_CATEGORY_TO_SERVICE_LEVEL: dict[str, str] = {
+    "fast_food_unit": "quick_service",
+    "quick_service": "quick_service",
+    "standard_restaurant": "casual_dining",
+    "drive_in": "quick_service",
+    "diner": "casual_dining",
+    "convenience_gas_station": "quick_service",
+    "convenience_retail": "quick_service",
+    "cafe_bakery": "fast_casual",
+    "in_store_grocery": "quick_service",
+    "bakery_specialty": "quick_service",
+    "mall_food_court": "quick_service",
+    "food_truck_mobile": "quick_service",
+    "ghost_kitchen": "quick_service",
+    "kiosk_pop_up": "quick_service",
+    "dinner_theater_cinema": "casual_dining",
+    "pub_tavern_bar": "casual_dining",
+    "pub_tavern": "casual_dining",
+    "clubhouse_private_venue": "casual_dining",
+    "buffet_cafeteria": "casual_dining",
+    "deli_cafe": "fast_casual",
+    "fast_food": "quick_service",
+    "coffee_shop": "fast_casual",
+}
+
+
+def _apply_merchant_service_level(restaurant: Restaurant) -> None:
+    """
+    Set restaurant.service_level from linked Merchant.service_level when not already set.
+
+    Gives users direct control: set service_level once on the Merchant, applies to all
+    linked restaurants. Only sets when service_level is currently empty.
+    """
+    if not restaurant.merchant_id or restaurant.service_level:
+        return
+    from app.merchants.models import Merchant
+
+    merchant = db.session.get(Merchant, restaurant.merchant_id)
+    if not merchant:
+        return
+    service_level = (merchant.service_level or "").strip().lower().replace(" ", "_")
+    if not service_level and merchant.category:
+        category_key = (merchant.category or "").strip().lower().replace(" ", "_")
+        service_level = _MERCHANT_CATEGORY_TO_SERVICE_LEVEL.get(category_key, "")
+    if service_level:
+        restaurant.service_level = service_level
+
+
+def _apply_merchant_cuisine(restaurant: Restaurant) -> None:
+    """Set restaurant.cuisine from linked Merchant.cuisine when not already set."""
+    if not restaurant.merchant_id or restaurant.cuisine:
+        return
+    from app.merchants.models import Merchant
+
+    merchant = db.session.get(Merchant, restaurant.merchant_id)
+    if merchant and merchant.cuisine:
+        restaurant.cuisine = merchant.cuisine
 
 
 def _auto_detect_service_level(restaurant: Restaurant) -> None:

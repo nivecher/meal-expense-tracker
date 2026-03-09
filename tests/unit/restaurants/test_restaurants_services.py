@@ -8,11 +8,13 @@ from decimal import Decimal
 from unittest.mock import Mock, patch
 
 import pytest
-from sqlalchemy import select
+from sqlalchemy import inspect, select
+from sqlalchemy.exc import IntegrityError
 
 from app import create_app
 from app.auth.models import User
 from app.extensions import db
+from app.merchants.models import Merchant
 from app.restaurants.exceptions import DuplicateRestaurantError
 from app.restaurants.models import Restaurant
 from app.restaurants.services import (
@@ -272,6 +274,34 @@ class TestRestaurantServices:
             assert len(result) == 1
             assert result[0].name == "Test Restaurant"
 
+    def test_apply_restaurant_filters_uses_merchant_chain_status(self, app, user, restaurant) -> None:
+        """Chain filter should use associated merchant chain status."""
+        user_obj, user_id = user
+        restaurant_obj, restaurant_id = restaurant
+        with app.app_context():
+            merchant = Merchant(name="Chain Brand", is_chain=True)
+            db.session.add(merchant)
+            db.session.flush()
+            restaurant_obj.merchant_id = merchant.id
+            db.session.add(restaurant_obj)
+            db.session.commit()
+
+            stmt = select(Restaurant).where(Restaurant.user_id == user_id)
+            filters = {
+                "search": "",
+                "cuisine": "",
+                "service_level": "",
+                "city": "",
+                "is_chain": "true",
+                "rating_min": "",
+                "rating_max": "",
+            }
+            filtered_stmt = apply_restaurant_filters(stmt, filters)
+            result = db.session.execute(filtered_stmt).scalars().all()
+
+            assert len(result) == 1
+            assert result[0].id == restaurant_id
+
     def test_apply_restaurant_sorting(self, app, user, restaurant) -> None:
         """Test applying restaurant sorting."""
         user_obj, user_id = user  # Unpack user and user_id
@@ -349,6 +379,8 @@ class TestRestaurantServices:
 
             assert len(export_data) == 1
             assert export_data[0]["name"] == "Test Restaurant"
+            assert "location_name" in export_data[0]
+            assert "located_within" in export_data[0]
             assert export_data[0]["cuisine"] == "italian"
             assert export_data[0]["service_level"] == "casual_dining"
 
@@ -375,6 +407,29 @@ class TestRestaurantServices:
             restaurants = get_restaurants_for_user(user_id)
             assert len(restaurants) == 1
             assert restaurants[0].name == "Imported Restaurant"
+
+    def test_import_restaurants_from_csv_auto_links_merchant_by_short_name(self, app, user) -> None:
+        """Restaurants imported with matching short-name prefix should link to merchant."""
+        user_obj, user_id = user
+        with app.app_context():
+            merchant = Merchant(name="Chili's Grill & Bar", short_name="Chili's", category="standard_restaurant")
+            db.session.add(merchant)
+            db.session.commit()
+
+            csv_data = "name,address,city,cuisine,service_level\n"
+            csv_data += "Chili's - Wylie,123 Import St,Wylie,american,casual_dining\n"
+
+            csv_file = Mock()
+            csv_file.stream.read.return_value.decode.return_value = csv_data
+            csv_file.filename = "test.csv"
+
+            success, result = import_restaurants_from_csv(csv_file, user_id)
+
+            assert success is True
+            assert result["success_count"] == 1
+            restaurant = db.session.scalar(select(Restaurant).where(Restaurant.user_id == user_id))
+            assert restaurant is not None
+            assert restaurant.merchant_id == merchant.id
 
     def test_import_restaurants_from_csv_with_errors(self, app, user) -> None:
         """Test importing restaurants from CSV with validation errors."""
@@ -467,6 +522,162 @@ class TestRestaurantServices:
             assert restaurant.cuisine == "Italian"
             assert restaurant.service_level == "casual_dining"
             assert is_new is True
+
+    def test_create_restaurant_with_form_auto_links_merchant_by_short_name(self, app, user) -> None:
+        """Restaurant creation should infer merchant from short-name prefix."""
+        user_obj, user_id = user
+        with app.app_context():
+            merchant = Merchant(name="Chili's Grill & Bar", short_name="Chili's", category="standard_restaurant")
+            db.session.add(merchant)
+            db.session.commit()
+
+            form = Mock()
+            form.name.data = "Chili's - Garland"
+            form.address_line_1.data = "123 Form St"
+            form.city.data = "Garland"
+            form.cuisine.data = "american"
+            form.service_level.data = "casual_dining"
+            form.google_place_id.data = ""
+            form.merchant_id.data = None
+
+            def mock_populate_obj(obj):
+                obj.name = form.name.data
+                obj.address_line_1 = form.address_line_1.data
+                obj.city = form.city.data
+                obj.cuisine = form.cuisine.data
+                obj.service_level = form.service_level.data
+                obj.google_place_id = form.google_place_id.data
+                obj.merchant_id = form.merchant_id.data
+                obj.type = "restaurant"
+
+            form.populate_obj = mock_populate_obj
+
+            restaurant, is_new = create_restaurant(user_id, form)
+
+            assert is_new is True
+            assert restaurant.merchant_id == merchant.id
+
+    def test_create_restaurant_integrity_error_keeps_other_session_objects_bound(self, app, user) -> None:
+        """Rollback on create failure should not detach unrelated loaded objects."""
+        user_obj, user_id = user
+        with app.app_context():
+            loaded_user = db.session.get(User, user_id)
+            assert loaded_user is not None
+
+            form = Mock()
+            form.name.data = "Form Restaurant"
+            form.city.data = "Form City"
+            form.google_place_id.data = ""
+            form.merchant_id.data = None
+
+            def mock_populate_obj(obj):
+                obj.name = form.name.data
+                obj.address_line_1 = "123 Form St"
+                obj.city = form.city.data
+                obj.google_place_id = form.google_place_id.data
+                obj.merchant_id = form.merchant_id.data
+                obj.type = "restaurant"
+
+            form.populate_obj = mock_populate_obj
+
+            with patch.object(
+                db.session,
+                "commit",
+                side_effect=IntegrityError("INSERT", {}, Exception("boom")),
+            ):
+                with pytest.raises(IntegrityError):
+                    create_restaurant(user_id, form)
+
+            assert inspect(loaded_user).session is db.session()
+
+    def test_create_restaurant_for_user_auto_links_merchant_by_name(self, app, user) -> None:
+        """API creation should infer merchant from full merchant-name prefix."""
+        user_obj, user_id = user
+        with app.app_context():
+            merchant = Merchant(name="Chili's Grill & Bar", short_name=None, category="standard_restaurant")
+            db.session.add(merchant)
+            db.session.commit()
+
+            data = {
+                "name": "Chili's Grill & Bar - Wylie",
+                "type": "restaurant",
+                "city": "Wylie",
+            }
+            restaurant = create_restaurant_for_user(user_id, data)
+
+            assert restaurant.merchant_id == merchant.id
+
+    def test_create_restaurant_for_user_auto_links_merchant_by_website_domain(self, app, user) -> None:
+        """API creation should infer merchant from website domain before name matching."""
+        user_obj, user_id = user
+        with app.app_context():
+            merchant = Merchant(
+                name="Starbucks",
+                short_name="Starbucks",
+                category="cafe_bakery",
+                website="https://www.starbucks.com/",
+            )
+            db.session.add(merchant)
+            db.session.commit()
+
+            data = {
+                "name": "Reserve Roastery Location",
+                "type": "restaurant",
+                "city": "Seattle",
+                "website": "https://starbucks.com/store-locator?store=123",
+            }
+            restaurant = create_restaurant_for_user(user_id, data)
+
+            assert restaurant.merchant_id == merchant.id
+
+    def test_merchant_category_sets_service_level_when_empty(self, app, user) -> None:
+        """When restaurant is linked to a merchant with category, service_level is set from it."""
+        user_obj, user_id = user
+        with app.app_context():
+            merchant = Merchant(
+                name="McDonald's",
+                short_name="McDonald's",
+                category="fast_food_unit",
+            )
+            db.session.add(merchant)
+            db.session.commit()
+
+            data = {
+                "name": "McDonald's - Main St",
+                "type": "restaurant",
+                "city": "Wylie",
+            }
+            # No service_level in data; should be set from merchant.category
+            restaurant = create_restaurant_for_user(user_id, data)
+
+            assert restaurant.merchant_id == merchant.id
+            assert restaurant.service_level == "quick_service"
+
+    def test_merchant_dimensions_backfill_restaurant_service_level_and_cuisine(self, app, user) -> None:
+        """Merchant service level and cuisine should populate empty restaurant fields."""
+        user_obj, user_id = user
+        with app.app_context():
+            merchant = Merchant(
+                name="Pei Wei Asian Kitchen",
+                category="standard_restaurant",
+                service_level="fast_casual",
+                cuisine="Asian",
+            )
+            db.session.add(merchant)
+            db.session.commit()
+
+            restaurant = create_restaurant_for_user(
+                user_id,
+                {
+                    "name": "Pei Wei Asian Kitchen - Plano",
+                    "type": "restaurant",
+                    "city": "Plano",
+                },
+            )
+
+            assert restaurant.merchant_id == merchant.id
+            assert restaurant.service_level == "fast_casual"
+            assert restaurant.cuisine == "Asian"
 
     def test_update_restaurant_with_form(self, app, user, restaurant) -> None:
         """Test updating a restaurant with form data."""

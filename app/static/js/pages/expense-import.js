@@ -33,16 +33,6 @@ function setProgressUiState({ percent, statusText, isAnimated }) {
   bar.classList.toggle('progress-bar-striped', isAnimated);
 }
 
-function setErrorUi(message) {
-  const errorEl = document.getElementById('import-upload-error');
-  if (!errorEl) {
-    return;
-  }
-
-  errorEl.textContent = message;
-  errorEl.classList.remove('d-none');
-}
-
 function clearErrorUi() {
   const errorEl = document.getElementById('import-upload-error');
   if (!errorEl) {
@@ -57,93 +47,6 @@ function setFormDisabled(form, isDisabled) {
   const buttons = form.querySelectorAll('button, input[type="submit"]');
   buttons.forEach((btn) => {
     btn.disabled = isDisabled;
-  });
-}
-
-function shouldNavigateToResponseUrl(requestUrl, responseUrl) {
-  if (!responseUrl) {
-    return false;
-  }
-
-  try {
-    const request = new URL(requestUrl, window.location.href);
-    const response = new URL(responseUrl, window.location.href);
-    const samePath = response.pathname === request.pathname;
-
-    return !samePath;
-  } catch {}
-}
-
-function replaceDocumentWithHtml(html) {
-  const blob = new Blob([html], { type: 'text/html' });
-  const url = URL.createObjectURL(blob);
-  window.location.assign(url);
-}
-
-function uploadImportForm({ form, fileInput }) {
-  const requestUrl = form.getAttribute('action') || window.location.href;
-  const formData = new FormData(form);
-
-  return new Promise((resolve, reject) => {
-    const xhr = new XMLHttpRequest();
-
-    xhr.open('POST', requestUrl);
-
-    xhr.upload.addEventListener('loadstart', () => {
-      setProgressUiVisible(true);
-      setProgressUiState({
-        percent: 0,
-        statusText: 'Uploading…',
-        isAnimated: true,
-      });
-    });
-
-    xhr.upload.addEventListener('progress', (event) => {
-      if (!event.lengthComputable) {
-        setProgressUiState({
-          percent: 0,
-          statusText: 'Uploading…',
-          isAnimated: true,
-        });
-        return;
-      }
-
-      const percent = Math.round((event.loaded / event.total) * 100);
-      setProgressUiState({
-        percent,
-        statusText: percent >= 100 ? 'Processing import…' : 'Uploading…',
-        isAnimated: true,
-      });
-    });
-
-    xhr.addEventListener('load', () => {
-      if (xhr.status >= 200 && xhr.status < 300) {
-        resolve({
-          requestUrl,
-          responseText: xhr.responseText,
-          responseUrl: xhr.responseURL,
-        });
-        return;
-      }
-
-      reject(new Error(`Upload failed with status ${xhr.status}`));
-    });
-
-    xhr.addEventListener('error', () => {
-      reject(new Error('Upload failed due to a network error'));
-    });
-
-    xhr.addEventListener('timeout', () => {
-      reject(new Error('Upload timed out'));
-    });
-
-    // Avoid "no file selected" edge cases
-    if (!fileInput.files.length) {
-      reject(new Error('Please select a file to upload'));
-      return;
-    }
-
-    xhr.send(formData);
   });
 }
 
@@ -174,26 +77,14 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
-    event.preventDefault();
-    event.stopPropagation();
-
     fileInput.classList.add('is-valid');
     setFormDisabled(form, true);
-
-    uploadImportForm({ form, fileInput })
-      .then(({ requestUrl, responseText, responseUrl }) => {
-        if (shouldNavigateToResponseUrl(requestUrl, responseUrl)) {
-          window.location.assign(responseUrl);
-          return;
-        }
-
-        replaceDocumentWithHtml(responseText);
-      })
-      .catch((error) => {
-        setErrorUi(error.message || 'Upload failed');
-        setProgressUiVisible(false);
-        setFormDisabled(form, false);
-      });
+    setProgressUiVisible(true);
+    setProgressUiState({
+      percent: 100,
+      statusText: 'Processing import…',
+      isAnimated: true,
+    });
   });
 
   fileInput.addEventListener('change', function onFileChange() {

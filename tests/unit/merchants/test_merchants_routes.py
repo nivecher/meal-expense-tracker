@@ -135,12 +135,24 @@ def test_edit_merchant_chain_suggestion_uses_current_user_restaurant_count(clien
 
     db.session.add_all(
         [
-            Restaurant(name="Shared One", city="Dallas", user_id=test_user.id, merchant_id=merchant.id, type="restaurant"),
-            Restaurant(name="Shared Two", city="Plano", user_id=test_user.id, merchant_id=merchant.id, type="restaurant"),
-            Restaurant(name="Other User One", city="Austin", user_id=test_user2.id, merchant_id=merchant.id, type="restaurant"),
-            Restaurant(name="Other User Two", city="Houston", user_id=test_user2.id, merchant_id=merchant.id, type="restaurant"),
-            Restaurant(name="Other User Three", city="Waco", user_id=test_user2.id, merchant_id=merchant.id, type="restaurant"),
-            Restaurant(name="Other User Four", city="Irving", user_id=test_user2.id, merchant_id=merchant.id, type="restaurant"),
+            Restaurant(
+                name="Shared One", city="Dallas", user_id=test_user.id, merchant_id=merchant.id, type="restaurant"
+            ),
+            Restaurant(
+                name="Shared Two", city="Plano", user_id=test_user.id, merchant_id=merchant.id, type="restaurant"
+            ),
+            Restaurant(
+                name="Other User One", city="Austin", user_id=test_user2.id, merchant_id=merchant.id, type="restaurant"
+            ),
+            Restaurant(
+                name="Other User Two", city="Houston", user_id=test_user2.id, merchant_id=merchant.id, type="restaurant"
+            ),
+            Restaurant(
+                name="Other User Three", city="Waco", user_id=test_user2.id, merchant_id=merchant.id, type="restaurant"
+            ),
+            Restaurant(
+                name="Other User Four", city="Irving", user_id=test_user2.id, merchant_id=merchant.id, type="restaurant"
+            ),
         ]
     )
     db.session.commit()
@@ -149,8 +161,10 @@ def test_edit_merchant_chain_suggestion_uses_current_user_restaurant_count(clien
     response = client.get(url_for("merchants.edit_merchant", merchant_id=merchant.id))
 
     assert response.status_code == 200
-    assert b"Suggested: mark as chain because 2 restaurant locations are linked." in response.data
-    assert b"Suggested: mark as chain because 6 restaurant locations are linked." not in response.data
+    response_text = response.data.decode("utf-8")
+    normalized_text = " ".join(response_text.split())
+    assert "Suggested: mark as chain because 2 restaurant locations are linked." in normalized_text
+    assert "Suggested: mark as chain because 6 restaurant locations are linked." not in normalized_text
 
 
 def test_view_merchant_shows_unlinked_matching_restaurants(client, auth, test_user) -> None:
@@ -513,11 +527,17 @@ def test_list_merchants_filters_missing_restaurants(client, auth, test_user) -> 
     merchant_with_restaurants = Merchant(name="Blue Baker")
     db.session.add_all([merchant_without_restaurants, merchant_with_restaurants])
     db.session.flush()
-    db.session.add(Restaurant(name="Blue Baker - Frisco", city="Frisco", user_id=test_user.id, merchant_id=merchant_with_restaurants.id))
+    db.session.add(
+        Restaurant(
+            name="Blue Baker - Frisco", city="Frisco", user_id=test_user.id, merchant_id=merchant_with_restaurants.id
+        )
+    )
     db.session.commit()
     auth.login("testuser_1", "testpass")
 
-    response = client.get(url_for("merchants.list_merchants"), query_string={"restaurant_status": "without_restaurants"})
+    response = client.get(
+        url_for("merchants.list_merchants"), query_string={"restaurant_status": "without_restaurants"}
+    )
 
     assert response.status_code == 200
     assert b"Brand Only" in response.data

@@ -1,0 +1,67 @@
+/* Merchant list card grid uses actual available width on this page. */
+
+#card-view-container {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 1rem;
+  width: 100%;
+}
+
+#card-view-container > .col {
+  min-width: 0;
+  max-width: none;
+  padding: 0;
+  width: auto;
+}
+
+@media (width >= 768px) {
+  #card-view-container {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (width >= 1400px) {
+  #card-view-container {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+.merchant-card-main {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.merchant-card-content {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.merchant-card-badges {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-start;
+  align-items: center;
+  row-gap: 0.5rem;
+  width: 100%;
+}
+
+.merchant-card-meta {
+  width: 100%;
+  text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.merchant-card-description {
+  width: 100%;
+  text-align: left;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  overflow: hidden;
+  line-height: 1.4;
+  max-height: 4.2em;
+}

@@ -1,5 +1,207 @@
-import { initializeRobustFaviconHandling } from '../utils/robust-favicon-handler.js';
 import { toast } from '../utils/notifications.js';
+
+function isActiveFilterValue(value) {
+  if (typeof value !== 'string') return false;
+  const normalized = value.trim();
+  return Boolean(normalized) && normalized !== 'None';
+}
+
+function getMerchantUrlParams() {
+  return new URLSearchParams(window.location.search);
+}
+
+function getActiveMerchantFilterCount() {
+  const urlParams = getMerchantUrlParams();
+  return ['category', 'service_level', 'cuisine', 'menu_focus', 'is_chain', 'has_description', 'restaurant_status'].reduce((count, key) => {
+    if (isActiveFilterValue(urlParams.get(key) || '')) {
+      return count + 1;
+    }
+    return count;
+  }, 0);
+}
+
+function updateMerchantFilterIndicators() {
+  const count = getActiveMerchantFilterCount();
+
+  const filterButton = document.getElementById('merchant-filter-button');
+  const filterCountBadge = document.getElementById('merchant-filter-count');
+  if (filterButton) {
+    if (count > 0) {
+      filterButton.classList.remove('btn-outline-secondary');
+      filterButton.classList.add('btn-primary');
+      filterButton.setAttribute('title', `${count} filters active`);
+    } else {
+      filterButton.classList.remove('btn-primary');
+      filterButton.classList.add('btn-outline-secondary');
+      filterButton.setAttribute('title', 'Filter merchants');
+    }
+  }
+
+  if (filterCountBadge) {
+    if (count > 0) {
+      filterCountBadge.textContent = `${count}`;
+      filterCountBadge.classList.remove('d-none');
+    } else {
+      filterCountBadge.textContent = '';
+      filterCountBadge.classList.add('d-none');
+    }
+  }
+
+  const statusCount = document.getElementById('merchant-filter-status-count');
+  const statusText = document.getElementById('merchant-filter-status-text');
+  if (statusCount) {
+    if (count > 0) {
+      statusCount.textContent = `${count}`;
+      statusCount.classList.remove('d-none');
+    } else {
+      statusCount.textContent = '';
+      statusCount.classList.add('d-none');
+    }
+  }
+
+  if (statusText) {
+    statusText.classList.toggle('d-none', count === 0);
+  }
+}
+
+function setSelectValue(selectId, value) {
+  const select = document.getElementById(selectId);
+  if (!select) return;
+  select.value = value || '';
+}
+
+function syncMerchantFilterFormFromUrl() {
+  const urlParams = getMerchantUrlParams();
+  setSelectValue('merchant-filter-category', urlParams.get('category'));
+  setSelectValue('merchant-filter-service-level', urlParams.get('service_level'));
+  setSelectValue('merchant-filter-cuisine', urlParams.get('cuisine'));
+  setSelectValue('merchant-filter-menu-focus', urlParams.get('menu_focus'));
+  setSelectValue('merchant-filter-is-chain', urlParams.get('is_chain'));
+  setSelectValue('merchant-filter-has-description', urlParams.get('has_description'));
+  setSelectValue('merchant-filter-restaurant-status', urlParams.get('restaurant_status'));
+  setSelectValue('merchant-filter-sort', urlParams.get('sort') || 'name');
+  setSelectValue('merchant-filter-order', urlParams.get('order') || 'asc');
+}
+
+function clearMerchantFilters() {
+  setSelectValue('merchant-filter-category', '');
+  setSelectValue('merchant-filter-service-level', '');
+  setSelectValue('merchant-filter-cuisine', '');
+  setSelectValue('merchant-filter-menu-focus', '');
+  setSelectValue('merchant-filter-is-chain', '');
+  setSelectValue('merchant-filter-has-description', '');
+  setSelectValue('merchant-filter-restaurant-status', '');
+  setSelectValue('merchant-filter-sort', 'name');
+  setSelectValue('merchant-filter-order', 'asc');
+
+  const form = document.getElementById('merchant-filter-form');
+  if (form instanceof HTMLFormElement) {
+    form.requestSubmit();
+  }
+}
+
+function initMerchantFilterClear() {
+  const clearButton = document.getElementById('merchant-filter-clear');
+  if (!(clearButton instanceof HTMLElement) || clearButton.dataset.listenerAttached === 'true') return;
+  clearButton.dataset.listenerAttached = 'true';
+  clearButton.addEventListener('click', () => {
+    clearMerchantFilters();
+  });
+}
+
+function syncMerchantFilterSearchValue() {
+  const searchInput = document.getElementById('merchant-search-input');
+  const filterForm = document.getElementById('merchant-filter-form');
+  if (!(searchInput instanceof HTMLInputElement) || !(filterForm instanceof HTMLFormElement)) return;
+
+  let hiddenSearchInput = filterForm.querySelector('input[name="q"]');
+  if (!(hiddenSearchInput instanceof HTMLInputElement)) {
+    hiddenSearchInput = document.createElement('input');
+    hiddenSearchInput.type = 'hidden';
+    hiddenSearchInput.name = 'q';
+    filterForm.prepend(hiddenSearchInput);
+  }
+  hiddenSearchInput.value = searchInput.value.trim();
+}
+
+function initMerchantFilterApply() {
+  const applyButton = document.getElementById('merchant-filter-apply');
+  const filterForm = document.getElementById('merchant-filter-form');
+  if (!(applyButton instanceof HTMLButtonElement) || !(filterForm instanceof HTMLFormElement)) return;
+  if (applyButton.dataset.listenerAttached === 'true') return;
+
+  applyButton.dataset.listenerAttached = 'true';
+  applyButton.addEventListener('click', () => {
+    syncMerchantFilterSearchValue();
+    filterForm.requestSubmit();
+
+    const modalElement = document.getElementById('merchantFilterModal');
+    if (modalElement && window.bootstrap?.Modal) {
+      const modalInstance = window.bootstrap.Modal.getInstance(modalElement);
+      modalInstance?.hide();
+    }
+  });
+}
+
+function updateMerchantSearchClearVisibility() {
+  const searchInput = document.getElementById('merchant-search-input');
+  const clearButton = document.getElementById('merchant-search-clear');
+  if (!(searchInput instanceof HTMLInputElement) || !(clearButton instanceof HTMLElement)) return;
+  clearButton.classList.toggle('d-none', !searchInput.value.trim());
+}
+
+function submitMerchantSearchForm() {
+  const form = document.getElementById('merchant-search-form');
+  if (form instanceof HTMLFormElement) {
+    form.requestSubmit();
+  }
+}
+
+function initMerchantSearch() {
+  const searchInput = document.getElementById('merchant-search-input');
+  const clearButton = document.getElementById('merchant-search-clear');
+  const form = document.getElementById('merchant-search-form');
+  if (!(searchInput instanceof HTMLInputElement) || !(form instanceof HTMLFormElement)) return;
+  if (searchInput.dataset.listenerAttached === 'true') {
+    updateMerchantSearchClearVisibility();
+    return;
+  }
+
+  searchInput.dataset.listenerAttached = 'true';
+
+  let debounceTimer = null;
+  searchInput.addEventListener('input', () => {
+    updateMerchantSearchClearVisibility();
+    if (debounceTimer) {
+      window.clearTimeout(debounceTimer);
+    }
+    debounceTimer = window.setTimeout(() => {
+      submitMerchantSearchForm();
+    }, 350);
+  });
+
+  searchInput.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape' && searchInput.value) {
+      event.preventDefault();
+      searchInput.value = '';
+      updateMerchantSearchClearVisibility();
+      submitMerchantSearchForm();
+    }
+  });
+
+  if (clearButton instanceof HTMLElement) {
+    if (clearButton.dataset.listenerAttached !== 'true') {
+      clearButton.dataset.listenerAttached = 'true';
+      clearButton.addEventListener('click', () => {
+        searchInput.value = '';
+        updateMerchantSearchClearVisibility();
+        submitMerchantSearchForm();
+      });
+    }
+  }
+
+  updateMerchantSearchClearVisibility();
+}
 
 function getCookieValue(name) {
   const cookieString = document.cookie || '';
@@ -122,11 +324,6 @@ function initViewToggle() {
   });
 
   applyMerchantViewPreference();
-}
-
-function initFaviconLoading() {
-  initializeRobustFaviconHandling('.restaurant-favicon');
-  initializeRobustFaviconHandling('.restaurant-favicon-table');
 }
 
 function setActionAnchorState(anchor, href, enabled) {
@@ -310,13 +507,17 @@ function cleanupModalBackdrop() {
   document.body.style.paddingRight = '';
 }
 
-function openMerchantDeleteModal(deleteUrl, merchantName) {
+function openMerchantDeleteModal(deleteUrl, merchantName, linkedRestaurantCount = 0) {
   if (!deleteUrl) return;
 
   const merchantNameElement = document.getElementById('merchantName');
+  const linkedRestaurantCountElement = document.getElementById('merchantLinkedRestaurantCount');
   const deleteForm = document.getElementById('deleteMerchantForm');
   if (merchantNameElement) {
     merchantNameElement.textContent = merchantName || '';
+  }
+  if (linkedRestaurantCountElement) {
+    linkedRestaurantCountElement.textContent = `${linkedRestaurantCount || 0}`;
   }
   if (deleteForm instanceof HTMLFormElement) {
     deleteForm.action = deleteUrl;
@@ -355,7 +556,7 @@ async function performBulkMerchantDelete(selectedInputs) {
       toast.error('Some merchants could not be deleted. Please retry.');
       return;
     }
-    toast.success('Selected merchants deleted.');
+    toast.success('Selected merchants deleted. Linked restaurants were unassigned.');
     window.location.reload();
   } catch {}
 }
@@ -389,7 +590,7 @@ function initMerchantDeleteFlow() {
         if (modalElement) {
           modalElement.addEventListener('hidden.bs.modal', cleanupModalBackdrop, { once: true });
         }
-        toast.success('Merchant deleted.');
+        toast.success('Merchant deleted. Linked restaurants were unassigned.');
         window.location.reload();
       } catch {}
     });
@@ -404,7 +605,8 @@ function initMerchantDeleteFlow() {
       event.preventDefault();
       const deleteUrl = cardDeleteAction.getAttribute('data-delete-url') || '';
       const merchantName = cardDeleteAction.getAttribute('data-merchant-name') || '';
-      openMerchantDeleteModal(deleteUrl, merchantName);
+      const linkedRestaurantCount = parseInt(cardDeleteAction.getAttribute('data-linked-restaurant-count') || '0', 10);
+      openMerchantDeleteModal(deleteUrl, merchantName, linkedRestaurantCount);
       return;
     }
 
@@ -415,7 +617,11 @@ function initMerchantDeleteFlow() {
 
       if (selectedInputs.length === 1) {
         const [selected] = selectedInputs;
-        openMerchantDeleteModal(selected.dataset.deleteUrl || '', selected.dataset.merchantName || '');
+        openMerchantDeleteModal(
+          selected.dataset.deleteUrl || '',
+          selected.dataset.merchantName || '',
+          parseInt(selected.dataset.linkedRestaurantCount || '0', 10),
+        );
         return;
       }
 
@@ -458,8 +664,8 @@ function getAlphaRows(alphaLabel) {
   return Array.from(document.querySelectorAll(`tr[data-merchant-alpha-group="${CSS.escape(alphaLabel)}"]`));
 }
 
-function getCategoryRows(categoryLabel) {
-  return Array.from(document.querySelectorAll(`tr[data-merchant-category-group="${CSS.escape(categoryLabel)}"]`));
+function getMerchantGroupRows(groupLabel) {
+  return Array.from(document.querySelectorAll(`tr[data-merchant-group-key="${CSS.escape(groupLabel)}"]`));
 }
 
 function setAlphaCollapsedState(dividerRow, alphaLabel, isCollapsed) {
@@ -482,16 +688,16 @@ function setAlphaCollapsedState(dividerRow, alphaLabel, isCollapsed) {
   }
 }
 
-function setCategoryCollapsedState(dividerRow, categoryLabel, isCollapsed) {
-  const rows = getCategoryRows(categoryLabel);
+function setMerchantGroupCollapsedState(dividerRow, groupLabel, isCollapsed) {
+  const rows = getMerchantGroupRows(groupLabel);
   rows.forEach((row) => {
     row.classList.toggle('city-hidden', isCollapsed);
   });
   if (!dividerRow) return;
 
-  dividerRow.dataset.merchantCategoryCollapsed = isCollapsed ? 'true' : 'false';
+  dividerRow.dataset.merchantGroupCollapsed = isCollapsed ? 'true' : 'false';
   dividerRow.classList.toggle('city-collapsed', isCollapsed);
-  const toggleButton = dividerRow.querySelector('[data-merchant-category-toggle]');
+  const toggleButton = dividerRow.querySelector('[data-merchant-group-toggle]');
   if (toggleButton) {
     toggleButton.setAttribute('aria-expanded', String(!isCollapsed));
     const icon = toggleButton.querySelector('i');
@@ -520,19 +726,23 @@ function initMerchantGroupToggles() {
       return;
     }
 
-    const categoryToggle = target.closest('[data-merchant-category-toggle]');
-    if (!categoryToggle) return;
-    const categoryLabel = categoryToggle.getAttribute('data-merchant-category-toggle') || '';
-    if (!categoryLabel) return;
-    const dividerRow = categoryToggle.closest('tr');
-    const currentlyCollapsed = dividerRow?.dataset.merchantCategoryCollapsed === 'true';
-    setCategoryCollapsedState(dividerRow, categoryLabel, !currentlyCollapsed);
+    const merchantGroupToggle = target.closest('[data-merchant-group-toggle]');
+    if (!merchantGroupToggle) return;
+    const groupLabel = merchantGroupToggle.getAttribute('data-merchant-group-toggle') || '';
+    if (!groupLabel) return;
+    const dividerRow = merchantGroupToggle.closest('tr');
+    const currentlyCollapsed = dividerRow?.dataset.merchantGroupCollapsed === 'true';
+    setMerchantGroupCollapsedState(dividerRow, groupLabel, !currentlyCollapsed);
   });
 }
 
 function init() {
+  initMerchantSearch();
+  syncMerchantFilterFormFromUrl();
+  updateMerchantFilterIndicators();
+  initMerchantFilterClear();
+  initMerchantFilterApply();
   initViewToggle();
-  initFaviconLoading();
   initMerchantSelectionActions();
   initMerchantRowClickSelection();
   initMerchantBulkExport();

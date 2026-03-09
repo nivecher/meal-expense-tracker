@@ -6,6 +6,7 @@ from unittest.mock import Mock, patch
 from flask import url_for
 
 from app.extensions import db
+from app.merchants.models import Merchant
 from app.restaurants.models import Restaurant
 
 
@@ -180,6 +181,68 @@ class TestRestaurantRoutesAdditional:
             data = response.get_json()
             assert data["success"] is False
 
+    def test_add_from_google_places_preserves_description(self, client, auth, test_user) -> None:
+        """Quick-add from Google Places must persist generated description when payload includes it."""
+        auth.login("testuser_1", "testpass")
+        payload = {
+            "name": "Sushi Place",
+            "type": "restaurant",
+            "address": "100 Main St",
+            "city": "Dallas",
+            "state": "TX",
+            "postal_code": "75001",
+            "country": "USA",
+            "google_place_id": "ChIJ_test_place_id_unique_123",
+            "description": "Japanese Restaurant • Casual Dining • $$ • rated 4.2 stars",
+        }
+        response = client.post(
+            url_for("restaurants.add_from_google_places"),
+            json=payload,
+            headers={"X-CSRFToken": "dummy_csrf_token"},
+        )
+        assert response.status_code == 200, response.get_data(as_text=True)
+        data = response.get_json()
+        assert data is not None and data.get("success") is True
+        rid = data.get("restaurant_id")
+        assert rid is not None
+        restaurant = db.session.get(Restaurant, rid)
+        assert restaurant is not None
+        assert restaurant.description == "Japanese Restaurant • Casual Dining • $$ • rated 4.2 stars"
+
+    def test_generate_description_rich_from_existing_fields(self) -> None:
+        """generate_description builds meaningful text from existing place details (no extra API calls)."""
+        from app.services.google_places_service import GooglePlacesService
+
+        service = GooglePlacesService(api_key="test_key")
+        place = {
+            "primaryType": "italian_restaurant",
+            "types": ["restaurant", "italian_restaurant"],
+            "priceLevel": "PRICE_LEVEL_MODERATE",
+            "rating": 4.5,
+        }
+        result = service.generate_description(place)
+        assert "•" in result or "Restaurant" in result
+        assert "rated 4.5 stars" in result or "4.5" in result
+        assert len(result) <= 500
+
+    def test_process_search_results_does_not_call_place_details(self, app) -> None:
+        """Search result processing must not trigger per-result Place Details (cost guardrail)."""
+        from app.restaurants.routes import _process_search_results
+
+        with app.app_context():
+            mock_service = Mock()
+            mock_service.process_search_result_place.return_value = {
+                "name": "Test Cafe",
+                "google_place_id": "ChIJ_test",
+            }
+            mock_service.build_photo_urls.return_value = []
+            mock_service.build_reviews_summary.return_value = []
+            places = [{"id": "ChIJ_one"}, {"id": "ChIJ_two"}]
+            params = {"max_results": 10}
+            _process_search_results(places, params, mock_service)
+            mock_service.process_search_result_place.assert_called()
+            mock_service.get_place_details.assert_not_called()
+
     def test_search_restaurants_with_filters(self, client, auth, test_user) -> None:
         """Test restaurant search with various filters."""
         auth.login("testuser_1", "testpass")
@@ -215,6 +278,69 @@ class TestRestaurantRoutesAdditional:
         )
 
         assert response.status_code == 200
+
+    def test_list_restaurants_filters_unlinked_merchants(self, client, auth, test_user) -> None:
+        """Restaurant list should support filtering to unlinked restaurants."""
+        merchant = Merchant(name="Acme Coffee", short_name="Acme", category="cafe_bakery")
+        db.session.add(merchant)
+        db.session.flush()
+
+        linked = Restaurant(
+            name="Acme - Downtown",
+            city="Dallas",
+            user_id=test_user.id,
+            type="restaurant",
+            merchant_id=merchant.id,
+        )
+        unlinked = Restaurant(name="Local Spot", city="Dallas", user_id=test_user.id, type="restaurant")
+        db.session.add_all([linked, unlinked])
+        db.session.commit()
+        auth.login("testuser_1", "testpass")
+
+        response = client.get(
+            url_for("restaurants.list_restaurants"),
+            query_string={"merchant_status": "unlinked"},
+        )
+
+        assert response.status_code == 200
+        assert b"Local Spot" in response.data
+        assert b"Acme - Downtown" not in response.data
+        assert b"Review unlinked restaurants" in response.data
+
+    def test_list_restaurants_filters_missing_location_name_for_chain_merchants(self, client, auth, test_user) -> None:
+        """Restaurant list should support filtering to chain-linked restaurants missing a location name."""
+        merchant = Merchant(name="Chipotle", short_name="Chipotle", is_chain=True)
+        db.session.add(merchant)
+        db.session.flush()
+
+        needs_location = Restaurant(
+            name="Chipotle",
+            city="Dallas",
+            user_id=test_user.id,
+            type="restaurant",
+            merchant_id=merchant.id,
+            location_name="",
+        )
+        has_location = Restaurant(
+            name="Chipotle",
+            city="Plano",
+            user_id=test_user.id,
+            type="restaurant",
+            merchant_id=merchant.id,
+            location_name="Legacy West",
+        )
+        db.session.add_all([needs_location, has_location])
+        db.session.commit()
+        auth.login("testuser_1", "testpass")
+
+        response = client.get(
+            url_for("restaurants.list_restaurants"),
+            query_string={"missing_location_name": "true"},
+        )
+
+        assert response.status_code == 200
+        assert b"Review missing location names" in response.data
+        assert b"Legacy West" not in response.data
 
     def test_clear_place_id_unauthorized(self, client, test_restaurant) -> None:
         """Test clear place ID without admin access."""
@@ -317,6 +443,8 @@ class TestRestaurantRoutesAdditional:
         data = response.get_json()
         assert isinstance(data, list)
         assert len(data) >= 1  # Should have at least the test restaurant
+        assert "location_name" in data[0]
+        assert "located_within" in data[0]
 
     def test_export_restaurants_invalid_format(self, client, auth, test_user) -> None:
         """Test exporting restaurants with invalid format."""

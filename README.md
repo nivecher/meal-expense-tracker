@@ -16,6 +16,7 @@ your culinary experiences.
   - Customizable expense categories with colors and icons
   - Advanced filtering and sorting
   - CSV export and bulk import capabilities
+  - Planned guided Quicken Simplifi import review with row-by-row match, create, and skip controls
   - Tag system for flexible organization
 
 - **Restaurant Management**
@@ -217,6 +218,20 @@ You can check the current version in several ways:
 3. **Open your browser**:
    - Visit: http://localhost:5000
    - Default admin: `admin@example.com` / `admin123`
+
+## 🧾 Import Roadmap
+
+Expense import is being expanded for bank-style CSV exports, especially Quicken Simplifi.
+
+Planned behavior:
+
+- support Simplifi dates such as `7-Mar-26`
+- ignore the `Exclusion` column for import eligibility
+- identify duplicate candidates using exact absolute amount and a one-to-three-day date window
+- compare payees to restaurant names and display names
+- require explicit row-by-row decisions to match an existing restaurant, create a restaurant, or skip
+
+The maintained design record is in [docs/EXPENSE_IMPORT_REVIEW_PLAN.md](/home/mtd37/workspace/meal-expense-tracker/docs/EXPENSE_IMPORT_REVIEW_PLAN.md) and the corresponding OpenSpec change under [openspec/changes/guided-simplifi-expense-import](/home/mtd37/workspace/meal-expense-tracker/openspec/changes/guided-simplifi-expense-import).
 
 ## 🔍 Linting Quick Start
 

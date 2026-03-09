@@ -1,0 +1,212 @@
+{% from 'macros/badge_helpers.html' import cuisine_badge, price_level_badge, service_level_badge %}
+{% set missing_location_list_url = url_for('restaurants.list_restaurants', missing_location_name='true') %}
+<div class="col">
+    <div class="card restaurant-list-card h-100 shadow-sm">
+        <div class="card-body">
+            <div class="restaurant-list-card-main">
+                <div class="restaurant-list-card-identity">
+                    <div class="restaurant-list-card-header">
+                        <div class="restaurant-list-card-header-top">
+                            <div class="restaurant-list-card-title-block">
+                                <div class="restaurant-icon flex-shrink-0">
+                                    {% if restaurant.merchant_favicon_url %}
+                                    <img
+                                        src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"
+                                        data-favicon-url="{{ restaurant.merchant_favicon_url }}"
+                                        data-size="32"
+                                        alt="{{ restaurant.display_name or restaurant.name }} icon"
+                                        class="restaurant-favicon"
+                                        width="32"
+                                        height="32"
+                                        style="opacity: 0; transition: opacity 0.2s ease-in-out" />
+                                    {% elif restaurant.website %}
+                                    <img
+                                        src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"
+                                        data-website="{{ restaurant.website }}"
+                                        data-size="32"
+                                        alt="{{ restaurant.display_name or restaurant.name }} icon"
+                                        class="restaurant-favicon"
+                                        width="32"
+                                        height="32"
+                                        style="opacity: 0; transition: opacity 0.2s ease-in-out" />
+                                    {% endif %}
+                                    <i
+                                        class="fas fa-utensils text-primary restaurant-fallback-icon{% if restaurant.merchant_favicon_url or restaurant.website %} d-none{% endif %}"></i>
+                                </div>
+                                <h5 class="card-title">
+                                    <a
+                                        href="{{ url_for('restaurants.restaurant_details', restaurant_id=restaurant.id) }}"
+                                        class="text-decoration-none text-dark restaurant-name-link"
+                                        data-bs-toggle="tooltip"
+                                        title="View Restaurant details"
+                                        >{{ restaurant.display_name or restaurant.name }}</a
+                                    >
+                                </h5>
+                            </div>
+                            {% if restaurant.rating %}
+                            <span class="badge bg-warning text-dark restaurant-rating-badge">
+                                <i class="fas fa-star"></i> {{ "%.1f"|format(restaurant.rating) }}
+                            </span>
+                            {% endif %}
+                        </div>
+                        <div class="restaurant-list-card-badges">
+                            {{ cuisine_badge(restaurant.cuisine, size='sm') }} {% if restaurant.price_level is not none
+                            %} {{ price_level_badge(restaurant.price_level, size='sm') }} {% endif %} {% if
+                            restaurant.service_level %} {{ service_level_badge(restaurant.service_level, size='sm') }}
+                            {% endif %}
+                        </div>
+                        <div class="restaurant-list-card-merchant-row">
+                            {% if restaurant.merchant_id %}
+                            <a
+                                href="{{ url_for('merchants.view_merchant', merchant_id=restaurant.merchant_id) }}"
+                                class="badge bg-light text-dark border text-decoration-none restaurant-merchant-badge"
+                                data-bs-toggle="tooltip"
+                                title="View merchant">
+                                <i class="fas fa-building me-1"></i>{{ restaurant.merchant_name or
+                                restaurant.merchant_short_name }}
+                            </a>
+                            {% else %}
+                            <span class="badge bg-warning text-dark">
+                                <i class="fas fa-link-slash me-1"></i>No merchant
+                            </span>
+                            {% endif %}
+                        </div>
+                        {% if restaurant.needs_location_name_cta %}
+                        <div class="mt-2">
+                            <a
+                                href="{{ url_for('restaurants.edit_restaurant', restaurant_id=restaurant.id, next=missing_location_list_url) }}#location_name"
+                                class="btn btn-sm btn-warning"
+                                title="Add a location name to keep chain locations distinct">
+                                <i class="fas fa-map-pin me-1"></i>Add location name
+                            </a>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="restaurant-list-card-details">
+                    <div class="card-text text-muted small mb-2 d-flex align-items-start restaurant-address-block">
+                        <div class="d-flex align-items-center me-2 mt-1 flex-shrink-0">
+                            <i class="fas fa-map-marker-alt me-1"></i>
+                        </div>
+                        <div class="flex-grow-1 min-w-0">
+                            {% if restaurant.get('address_line_1') or restaurant.get('address_line_2') or
+                            restaurant.get('city') or restaurant.get('state') or restaurant.get('postal_code') %}
+                            <div class="d-flex align-items-center flex-wrap gap-2">
+                                <span>
+                                    {% if restaurant.get('address_line_1') %}{{ restaurant.get('address_line_1') }}{%
+                                    endif %} {% if restaurant.get('address_line_2') %} {% if
+                                    restaurant.get('address_line_1') %}, {% endif %}{{ restaurant.get('address_line_2')
+                                    }} {% endif %}
+                                </span>
+                                {% set maps_url = restaurant|google_maps_url %} {% if maps_url %}
+                                <a
+                                    href="{{ maps_url }}"
+                                    class="text-primary"
+                                    data-bs-toggle="tooltip"
+                                    title="View in Google Maps">
+                                    <i class="fas fa-map-marked-alt fa-sm"></i>
+                                </a>
+                                {% endif %}
+                            </div>
+                            {% set locality = [] %} {% if restaurant.get('city') %}{% set _ =
+                            locality.append(restaurant.get('city')) %}{% endif %} {% if restaurant.get('state') %}{% set
+                            _ = locality.append(restaurant.get('state')) %}{% endif %} {% if
+                            restaurant.get('postal_code') %}{% set _ = locality.append(restaurant.get('postal_code'))
+                            %}{% endif %} {% if locality %}
+                            <div>{{ locality|join(', ') }}</div>
+                            {% endif %} {% if restaurant.get('located_within') %}
+                            <br /><span class="text-muted small"
+                                >Located within: {{ restaurant.get('located_within') }}</span
+                            >
+                            {% endif %} {% else %}
+                            <span class="text-muted">No address</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% if restaurant.phone %}
+                    <p class="card-text text-muted small mb-2">
+                        <i class="fas fa-phone me-2"></i> {{ restaurant.phone }}
+                    </p>
+                    {% endif %} {% if restaurant.website %}
+                    <p class="card-text text-muted small mb-2">
+                        <i class="fas fa-globe me-2"></i>
+                        <a
+                            href="{{ restaurant.website }}"
+                            class="text-muted restaurant-website-link"
+                            title="{{ restaurant.website }}"
+                            >{{ restaurant.website }}</a
+                        >
+                    </p>
+                    {% endif %} {% if restaurant.notes %}
+                    <div class="card-text small mb-0">
+                        <div class="text-muted">
+                            <i class="fas fa-sticky-note me-2"></i>
+                            <span class="fst-italic">{{ restaurant.notes }}</span>
+                        </div>
+                    </div>
+                    {% endif %} {% if not restaurant.merchant_id %}
+                    <div class="mt-3">
+                        <a
+                            href="{{ url_for('restaurants.edit_restaurant', restaurant_id=restaurant.id) }}"
+                            class="btn btn-sm btn-warning">
+                            <i class="fas fa-link me-1"></i>Associate merchant
+                        </a>
+                    </div>
+                    {% endif %}
+                </div>
+                <div class="restaurant-list-card-meta">
+                    {% if restaurant.last_visit %}
+                    <div class="text-muted small">
+                        <i class="far fa-calendar-alt me-2"></i>
+                        Last visited {{ restaurant.last_visit|time_ago }}
+                    </div>
+                    {% endif %}
+                    <div class="restaurant-list-card-footer">
+                        <div class="d-flex gap-3 text-muted small">
+                            <span>
+                                <i class="fas fa-receipt me-2"></i>
+                                {{ restaurant.visit_count }} visit{{ 's' if restaurant.visit_count != 1 else '' }}
+                            </span>
+                            <span>
+                                <i class="fas fa-user-friends me-2 text-info"></i>
+                                {% if restaurant.avg_price_per_person and restaurant.avg_price_per_person > 0 %} {{
+                                restaurant.avg_price_per_person|format_currency_usd }} {% else %} - {% endif %}
+                            </span>
+                            <span>
+                                <i class="fas fa-dollar-sign me-2"></i>
+                                {{ restaurant.total_spent|format_currency_usd }}
+                            </span>
+                        </div>
+                        <div class="restaurant-list-card-actions">
+                            {% if restaurant.place_id %}
+                            <a
+                                href="https://www.google.com/maps/search/?api=1&query={{ restaurant.name|urlencode }}&query_place_id={{ restaurant.place_id }}"
+                                class="btn btn-sm btn-outline-secondary"
+                                data-bs-toggle="tooltip"
+                                title="View on Google Maps">
+                                <i class="fas fa-map-marked-alt me-1"></i><span class="d-none d-sm-inline">Maps</span>
+                            </a>
+                            {% endif %}
+                            <a
+                                href="{{ url_for('expenses.add_expense', restaurant_id=restaurant.id) }}"
+                                class="btn btn-sm btn-outline-primary"
+                                data-bs-toggle="tooltip"
+                                title="Add new expense">
+                                <i class="fas fa-plus me-1"></i><span class="d-none d-lg-inline">Add Expense</span>
+                            </a>
+                            <button
+                                type="button"
+                                class="btn btn-sm btn-outline-danger"
+                                data-action="delete-restaurant"
+                                data-restaurant-id="{{ restaurant.id }}"
+                                data-restaurant-name="{{ restaurant.display_name or restaurant.name }}"
+                                aria-label="Delete restaurant">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

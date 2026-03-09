@@ -10,8 +10,8 @@ from .base import BaseModel, ModelType, SessionType
 
 # Export all models and types
 __all__ = [
+    "APICache",
     "BaseModel",
     "ModelType",
     "SessionType",
-    "APICache",
 ]

@@ -49,7 +49,9 @@ Tracker{% endblock %} {% block styles %}
                             id="description"
                             name="description"
                             rows="3"
-                            placeholder="Short brand summary or notes">{{ (merchant.description if merchant else prefill.description) or '' }}</textarea>
+                            placeholder="Short brand summary or notes">
+{{ (merchant.description if merchant else prefill.description) or '' }}</textarea
+                        >
                     </div>
 
                     <div class="mb-3">
@@ -132,15 +134,26 @@ Tracker{% endblock %} {% block styles %}
                                 role="switch"
                                 id="is_chain"
                                 name="is_chain"
-                                {% if selected_is_chain in [true, 'true', 'True', 1, '1', 'on', 'yes'] %}checked{% endif %} />
+                                {%
+                                if
+                                selected_is_chain
+                                in
+                                [true, 'true', 'True', 1, '1', 'on', 'yes']
+                                %}checked{%
+                                endif
+                                %} />
                             <label for="is_chain" class="form-check-label">Chain Brand</label>
                         </div>
-                        <small class="text-muted">Use this on the merchant brand, not individual restaurant locations.</small>
-                        {% set linked_restaurant_count = merchant_summary.restaurant_count if merchant_summary is defined and merchant_summary else 0 %}
-                        {% if merchant and not merchant.is_chain and linked_restaurant_count > 1 %}
-                        <div class="form-text text-warning">
-                            Suggested: mark as chain because {{ linked_restaurant_count }} restaurant locations are linked.
-                        </div>
+                        <small class="text-muted"
+                            >Use this on the merchant brand, not individual restaurant locations.</small
+                        >
+                        {% set linked_restaurant_count = merchant_summary.restaurant_count if merchant_summary is
+                        defined and merchant_summary else 0 %} {% if merchant and not merchant.is_chain and
+                        linked_restaurant_count > 1 %}
+                        <div class="form-text text-warning"
+                            >Suggested: mark as chain because {{ linked_restaurant_count }} restaurant locations are
+                            linked.</div
+                        >
                         {% endif %}
                     </div>
 
@@ -176,17 +189,21 @@ Tracker{% endblock %} {% block styles %}
                             {% for group in format_category_groups %}
                             <optgroup label="{{ group.label }}">
                                 {% for option in group.options %}
-                                <option value="{{ option.value }}" {% if selected_category == option.value %}selected{% endif %}>
+                                <option
+                                    value="{{ option.value }}"
+                                    {% if selected_category == option.value %}selected{% endif %}>
                                     {{ option.label }}
                                 </option>
                                 {% endfor %}
                             </optgroup>
                             {% endfor %}
-                            <option value="other" {% if selected_category == 'other' %}selected{% endif %}>Other</option>
+                            <option value="other" {% if selected_category == 'other' %}selected{% endif %}
+                                >Other</option
+                            >
                         </select>
                         <small class="text-muted d-block mt-1">
-                            Format describes the physical or operating footprint, not cuisine or service style. See
-                            Help for definitions.
+                            Format describes the physical or operating footprint, not cuisine or service style. See Help
+                            for definitions.
                         </small>
                     </div>
 
@@ -202,12 +219,16 @@ Tracker{% endblock %} {% block styles %}
                         <select class="form-select mt-2" id="rewards_program_id" name="rewards_program_id">
                             <option value="">-- No Rewards Program --</option>
                             {% for rewards_program_id, rewards_program_name in rewards_program_choices %}
-                            <option value="{{ rewards_program_id }}" {% if selected_rewards_program_id|string == rewards_program_id|string %}selected{% endif %}>
+                            <option
+                                value="{{ rewards_program_id }}"
+                                {% if selected_rewards_program_id|string == rewards_program_id|string %}selected{% endif %}>
                                 {{ rewards_program_name }}
                             </option>
                             {% endfor %}
                         </select>
-                        <small class="text-muted">Advanced feature. Links this merchant to one rewards program for your account.</small>
+                        <small class="text-muted"
+                            >Advanced feature. Links this merchant to one rewards program for your account.</small
+                        >
                     </div>
 
                     <div class="d-flex justify-content-between">
@@ -231,8 +252,8 @@ Tracker{% endblock %} {% block styles %}
             </div>
             <div class="card-body">
                 <div class="list-group list-group-flush">
-                    {% for restaurant_entry in restaurants %}
-                    {% set restaurant = restaurant_entry.restaurant if restaurant_entry.restaurant is defined else restaurant_entry %}
+                    {% for restaurant_entry in restaurants %} {% set restaurant = restaurant_entry.restaurant if
+                    restaurant_entry.restaurant is defined else restaurant_entry %}
                     <a
                         href="{{ url_for('restaurants.restaurant_details', restaurant_id=restaurant.id) }}"
                         class="list-group-item list-group-item-action px-0">
@@ -244,9 +265,9 @@ Tracker{% endblock %} {% block styles %}
                                 </small>
                             </div>
                             <div class="text-end small text-muted">
-                                {% set expense_count = restaurant_entry.expense_count|default(0) %}
-                                {% set total_amount = restaurant_entry.total_amount|default(0) %}
-                                {% set last_expense_date = restaurant_entry.last_expense_date|default(none) %}
+                                {% set expense_count = restaurant_entry.expense_count|default(0) %} {% set total_amount
+                                = restaurant_entry.total_amount|default(0) %} {% set last_expense_date =
+                                restaurant_entry.last_expense_date|default(none) %}
                                 <div>{{ expense_count }} expense{{ 's' if expense_count != 1 else '' }}</div>
                                 <div class="fw-semibold text-success">{{ total_amount|format_currency_usd }}</div>
                                 {% if last_expense_date %}

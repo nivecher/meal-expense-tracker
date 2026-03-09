@@ -2,86 +2,68 @@
 
 ## Overview
 
-The favicon system is now set up correctly, standardly, and simply following industry best practices.
+The app loads restaurant and merchant favicons using a canonical website URL (backend-normalized) and tries multiple host candidates (www and apex) and multiple favicon sources until one succeeds. Initialization is centralized in `main.js`; dynamic content (e.g. after HTMX) re-initializes only where needed.
 
-## ✅ **Standard Setup**
+## Standard Setup
 
-### 1. **Main App Integration**
+### 1. Main app integration
 
-- Initializes as part of main application startup
-- Integrated with main.js initialization flow
-- Handles all `.restaurant-favicon` and `.restaurant-favicon-table` elements
+- **Entry point**: `main.js` calls `initializeFaviconSystem()` once when the app loads (deferred via `runWhenIdle`).
+- **Selectors**: `.restaurant-favicon` and `.restaurant-favicon-table` are initialized by that call.
+- **Dynamic content**: Pages that inject new HTML (e.g. restaurant list, expense list after HTMX swap) call `initializeRobustFaviconHandling` for those selectors again so new elements get favicons.
 
-### 2. **Modern API Usage**
+### 2. Favicon source order
 
-- **Primary**: Google Favicon V2 API (`t3.gstatic.com/faviconV2`)
-- **Fallback**: Google Legacy API (`google.com/s2/favicons`)
-- **Secondary**: DuckDuckGo Icons (very stable)
-- **Tertiary**: GitHub Favicons (stable)
+Sources are tried in this order (per host candidate):
 
-### 3. **Simple Integration**
+1. **DuckDuckGo** – `icons.duckduckgo.com/ip3/{domain}.ico`
+2. **Direct** – `https://{domain}/favicon.ico`
+3. **Google Legacy** – `google.com/s2/favicons?domain=...`
+4. **Google Favicon V2** – `t3.gstatic.com/faviconV2?client=SOCIAL&...`
 
-```javascript
-// Auto-initializes on DOM ready - no setup needed
-// Available globally for manual use if needed:
-window.RobustFaviconHandler.initialize(".custom-favicon");
-```
+For each website, the handler derives **host candidates** (canonical host plus www/apex alternate) and tries all sources for the first candidate, then all sources for the second. That way sites like `chick-fil-a.com` and `www.chick-fil-a.com` resolve consistently.
 
-### 4. **Standard Error Handling**
+### 3. Favicon policy (who shows which icon)
 
-- Graceful fallbacks to restaurant icons
-- CORS error suppression
-- No console spam
-- Clean error handling
+**Precedence** (highest first):
 
-## 🔧 **Debug Commands** (Development Only)
+1. **Merchant favicon override** – If a merchant has an optional **Favicon URL** set (Edit Merchant), that URL is used for that merchant everywhere (merchant list/detail, restaurant list/detail/form when the restaurant is linked to that merchant). No website-derived lookup is done.
+2. **Website-derived** – Restaurant or merchant website URL is used to resolve favicon via host candidates and the fixed source order above.
+3. **Fallback icon** – Utensils or building icon when all else fails.
 
-```javascript
-// Available on localhost only
-window.faviconDebug.stats(); // Get cache statistics
-window.faviconDebug.testDomain("example.com"); // Test specific domain
-window.faviconDebug.clearCache(); // Clear favicon cache
-window.faviconDebug.enableDebug(); // Enable debug mode
+- **Restaurant views**: Merchant `favicon_url` if present and restaurant linked to that merchant; else restaurant website.
+- **Merchant views**: Merchant `favicon_url` if set; else merchant website.
+- **Restaurant form preview**: Same: merchant favicon override when linked and set; else restaurant website or merchant website.
 
-// Enable debug messages in console
-localStorage.setItem("debugMode", "true"); // Or add ?debug=true to URL
-```
+### 4. Backend canonicalization
 
-## 📁 **File Structure**
+Website URLs are normalized on ingest (restaurants, merchants, Google Places) via `canonicalize_website_for_storage()` in `app/utils/url_utils.py`, so stored values have lowercase host, no query params, and a consistent path. Favicon host candidates are derived from that canonical URL.
 
-- **Main Handler**: `app/static/js/utils/robust-favicon-handler.js`
-- **Auto-Initialization**: DOM ready event
-- **Global Access**: `window.RobustFaviconHandler`
-- **Debug Commands**: `window.faviconDebug` (localhost only)
+### 5. Error handling
 
-## 🎯 **Usage**
+- Minimal global suppression: one `error` listener stops propagation for IMG load errors from our favicon URLs (DuckDuckGo, Google, gstatic) so expected 404s don’t clutter the console.
+- Failed domains are cached (one failure per domain) so we don’t retry known-bad hosts.
+- Known problematic root domains (e.g. wix.com, squarespace.com, weebly.com) are skipped entirely.
+- When all sources fail, the UI shows the fallback icon (utensils or building).
 
-### Automatic (Recommended)
+## File structure
 
-The system is initialized with the main application and handles all favicon elements with these classes:
+- **Handler**: `app/static/js/utils/robust-favicon-handler.js` (fixed source order, `data-favicon-url` for merchant override)
+- **Initialization**: `main.js` → `initializeFaviconSystem()`
+- **URL helpers**: `app/utils/url_utils.py` (`canonicalize_website_for_storage`, `get_favicon_host_candidates`, `validate_favicon_url`)
+- **Merchant override**: `Merchant.favicon_url` in `app/merchants/models.py`; validated in services and shown in merchant/restaurant templates
 
-- `.restaurant-favicon`
-- `.restaurant-favicon-table`
+## Debug (development)
 
-### Manual (If Needed)
+- **URL**: Add `?debug=favicon` to the page URL for favicon debug logs.
+- **Console**: On localhost, `window.faviconDebug.clearCache()` clears the favicon cache.
+- **Global**: `window.RobustFaviconHandler` exposes `initialize`, `clearCache`, `getCacheStats`, `getFaviconHostCandidates`, etc.
+
+## Manual init for dynamic content
 
 ```javascript
-// For dynamically added content
-window.RobustFaviconHandler.initialize(".my-favicon-class");
+// After injecting HTML that contains favicon placeholders
+import { initializeRobustFaviconHandling } from "./utils/robust-favicon-handler.js";
+initializeRobustFaviconHandling(".restaurant-favicon");
+initializeRobustFaviconHandling(".restaurant-favicon-table");
 ```
-
-## ✅ **Standards Compliance**
-
-- **Industry Standard**: Google Favicon V2 API as primary source
-- **RFC Compliant**: Follows standard favicon loading patterns
-- **Performance Optimized**: Caching, timeouts, error handling
-- **Clean Code**: No redundant initializations, simple setup
-- **Error Handling**: Graceful degradation, no console spam
-
-## 🚀 **Benefits**
-
-- **Zero Setup**: Works automatically
-- **Reliable**: Uses most stable favicon services
-- **Fast**: Optimized with caching and timeouts
-- **Clean**: No 404 errors or console spam
-- **Standard**: Follows industry best practices

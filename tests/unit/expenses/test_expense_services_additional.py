@@ -2,8 +2,12 @@
 
 from datetime import UTC, date, datetime, time
 from decimal import Decimal
+from pathlib import Path
 from unittest.mock import Mock, patch
 
+from werkzeug.datastructures import MultiDict
+
+from app.expenses.models import Expense
 from app.expenses.services import (
     _combine_date_time_with_timezone,
     _parse_tags_json,
@@ -11,21 +15,49 @@ from app.expenses.services import (
     _process_date,
     _sort_categories_by_default_order,
     _validate_tags_list,
+    create_expense,
+    get_receipt_reconciliation,
     prepare_expense_form,
     update_expense,
 )
+from app.receipts.models import Receipt
 
 
 class MockForm:
     """Simple mock form for testing."""
 
     def __init__(self, **kwargs):
-        for key, value in kwargs.items():
+        defaults = {
+            "cleared_date": None,
+        }
+        defaults.update(kwargs)
+        self.data = defaults.copy()
+        for key, value in defaults.items():
             setattr(self, key, type("Field", (), {"data": value})())
 
 
 class TestExpenseServicesAdditional:
     """Additional tests for expense services."""
+
+    def test_expense_form_requires_restaurant_date_and_amount(self, app) -> None:
+        """Test the expense form required field contract."""
+        from app.expenses.forms import ExpenseForm
+
+        with app.test_request_context("/expenses/add", method="POST"):
+            form = ExpenseForm(
+                formdata=MultiDict(
+                    {
+                        "restaurant_id": "",
+                        "date": "",
+                        "amount": "",
+                    }
+                )
+            )
+
+            assert form.validate() is False
+            assert "Restaurant is required" in form.restaurant_id.errors
+            assert "Visit Date is required" in form.date.errors
+            assert "Amount is required" in form.amount.errors
 
     def test_prepare_expense_form(self, app) -> None:
         """Test preparing expense form with data."""
@@ -452,3 +484,138 @@ class TestExpenseServicesAdditional:
                 f"Date changed! Expected July 23, got {updated_date_browser_tz.date()}. "
                 f"UTC date: {updated_expense.date.date()}, UTC datetime: {updated_expense.date}"
             )
+
+    def test_get_receipt_reconciliation_marks_reconciled_records(
+        self, app, session, test_user, test_restaurant, test_category, tmp_path
+    ) -> None:
+        """Test reconciliation rows when storage, receipt rows, and expense links align."""
+        with app.app_context():
+            app.config["UPLOAD_FOLDER"] = str(tmp_path)
+            receipt_path = "local-receipt.png"
+            (Path(tmp_path) / receipt_path).write_bytes(b"receipt")
+
+            expense = Expense(
+                amount=Decimal("23.45"),
+                date=datetime.now(UTC),
+                notes="Reconciled receipt",
+                user_id=test_user.id,
+                restaurant_id=test_restaurant.id,
+                category_id=test_category.id,
+                receipt_image=receipt_path,
+            )
+            session.add(expense)
+            session.commit()
+            session.refresh(expense)
+
+            receipt = Receipt(
+                user_id=test_user.id,
+                expense_id=expense.id,
+                file_uri=receipt_path,
+                ocr_total=Decimal("23.45"),
+            )
+            session.add(receipt)
+            session.commit()
+
+            rows, summary = get_receipt_reconciliation(test_user.id)
+
+            assert summary["total_receipts"] == 1
+            assert summary["reconciled"] == 1
+            assert len(rows) == 1
+            assert rows[0]["status"] == "reconciled"
+            assert rows[0]["storage_exists"] is True
+            assert rows[0]["linked_expense_ids"] == [expense.id]
+            assert rows[0]["receipt_row_ids"] == [receipt.id]
+
+    def test_get_receipt_reconciliation_flags_missing_db_row(
+        self, app, session, test_user, test_expense, tmp_path
+    ) -> None:
+        """Test reconciliation rows when an expense image exists without a structured receipt row."""
+        from app.extensions import db
+
+        with app.app_context():
+            app.config["UPLOAD_FOLDER"] = str(tmp_path)
+            expense = db.session.get(Expense, test_expense.id)
+            assert expense is not None
+            expense.receipt_image = "missing-row.png"
+            db.session.commit()
+
+            rows, summary = get_receipt_reconciliation(test_user.id)
+
+            assert summary["missing_receipt_row"] == 1
+            assert len(rows) == 1
+            assert rows[0]["status"] == "missing_receipt_row"
+            assert "Missing receipt DB row" in rows[0]["issues"]
+
+    def test_create_expense_creates_structured_receipt_row(
+        self, app, session, test_user, test_restaurant, test_category
+    ) -> None:
+        """Test uploaded receipts are stored as structured Receipt rows."""
+        form = MockForm(
+            category_id=test_category.id,
+            restaurant_id=test_restaurant.id,
+            date=date(2024, 7, 23),
+            time=None,
+            amount=Decimal("19.50"),
+            notes="Structured receipt create",
+            meal_type="lunch",
+            order_type=None,
+            party_size=None,
+            tags="[]",
+        )
+        receipt_file = Mock()
+        receipt_file.filename = "receipt.png"
+
+        with app.app_context():
+            with patch("app.utils.timezone_utils.get_browser_timezone", return_value="UTC"):
+                with patch("app.utils.timezone_utils.normalize_timezone", return_value="UTC"):
+                    with patch(
+                        "app.expenses.utils.save_receipt_to_storage", return_value=("receipts/create.png", None)
+                    ):
+                        expense, error = create_expense(test_user.id, form, receipt_file)
+
+            assert error is None
+            assert expense is not None
+            assert expense.receipt_storage_path == "receipts/create.png"
+
+            receipt = session.query(Receipt).filter_by(expense_id=expense.id, user_id=test_user.id).one()
+            assert receipt.file_uri == "receipts/create.png"
+            assert receipt.receipt_type == "paper"
+
+    def test_update_expense_deletes_structured_receipt_row(
+        self, app, session, test_user, test_expense, test_restaurant, test_category
+    ) -> None:
+        """Test deleting a receipt removes the structured Receipt row as well."""
+        with app.app_context():
+            test_expense.receipt_image = "receipts/existing.png"
+            receipt = Receipt(
+                user_id=test_user.id,
+                expense_id=test_expense.id,
+                restaurant_id=test_restaurant.id,
+                file_uri="receipts/existing.png",
+                receipt_type="paper",
+            )
+            session.add(receipt)
+            session.commit()
+
+            form = MockForm(
+                category_id=test_category.id,
+                restaurant_id=test_restaurant.id,
+                date=test_expense.date.date(),
+                time=None,
+                amount=test_expense.amount,
+                notes=test_expense.notes,
+                meal_type=test_expense.meal_type,
+                order_type=test_expense.order_type,
+                party_size=test_expense.party_size,
+                tags="[]",
+            )
+
+            with patch("app.utils.timezone_utils.get_browser_timezone", return_value="UTC"):
+                with patch("app.utils.timezone_utils.normalize_timezone", return_value="UTC"):
+                    with patch("app.expenses.utils.delete_receipt_from_storage", return_value=None):
+                        updated_expense, error = update_expense(test_expense, form, delete_receipt=True)
+
+            assert error is None
+            assert updated_expense is not None
+            assert updated_expense.receipt_storage_path is None
+            assert session.query(Receipt).filter_by(expense_id=test_expense.id, user_id=test_user.id).count() == 0

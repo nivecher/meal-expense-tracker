@@ -1,0 +1,183 @@
+{% extends "base.html" %} {% block title %}{{ program.name }} - Loyalty{% endblock %} {% block main_container_class
+%}container-fluid{% endblock %} {% block styles %}
+<link href="{{ url_for('static', filename='css/pages/restaurant-list.css') }}" rel="stylesheet" />
+{% endblock styles %} {% block section_header %}
+<div class="section-title">
+    <i class="fas fa-building text-primary"></i>
+    <h1>Merchants</h1>
+</div>
+{% endblock %} {% block content %}
+<div class="py-4">
+    {% set has_loyalty_favicon = program.website or program.portal_url %}
+    <ul class="nav nav-tabs mb-3" role="tablist">
+        <li class="nav-item" role="presentation">
+            <a class="nav-link" href="{{ url_for('merchants.list_merchants') }}"
+                ><i class="fas fa-list me-1"></i>Merchants</a
+            >
+        </li>
+        <li class="nav-item" role="presentation">
+            <a class="nav-link" href="{{ url_for('merchants.review_restaurant_associations') }}"
+                ><i class="fas fa-link me-1"></i>Associations</a
+            >
+        </li>
+        <li class="nav-item" role="presentation">
+            <a class="nav-link active" href="{{ url_for('loyalty.list_rewards_programs') }}"
+                ><i class="fas fa-award me-1"></i>Loyalty</a
+            >
+        </li>
+    </ul>
+
+    <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-4">
+        <div class="d-flex align-items-start gap-3">
+            <div class="restaurant-icon flex-shrink-0">
+                {% if has_loyalty_favicon %}
+                <img
+                    src="{{ url_for('static', filename='img/favicons/favicon-32x32.png') }}"
+                    data-website="{{ program.website or program.portal_url }}"
+                    data-size="40"
+                    alt="{{ program.name }} icon"
+                    class="restaurant-favicon"
+                    width="40"
+                    height="40" />
+                <i class="fas fa-award text-primary restaurant-fallback-icon d-none"></i>
+                {% else %}
+                <i class="fas fa-award text-primary" style="font-size: 32px"></i>
+                {% endif %}
+            </div>
+            <div>
+                <h1 class="h3 mb-1"
+                    >{% if not has_loyalty_favicon %}<i class="fas fa-award text-primary me-2"></i>{% endif %}{{
+                    program.name }}</h1
+                >
+                <p class="text-muted mb-0">Rewards program and your account details.</p>
+            </div>
+        </div>
+        <div class="d-flex gap-2">
+            <a href="{{ url_for('loyalty.list_rewards_programs') }}" class="btn btn-outline-secondary">
+                <i class="fas fa-arrow-left me-1"></i>Back
+            </a>
+            {% if program.portal_url or program.website %}
+            <a
+                href="{{ program.portal_url or program.website }}"
+                class="btn btn-outline-secondary"
+                target="_blank"
+                rel="noopener noreferrer">
+                <i class="fas fa-right-to-bracket me-1"></i>Login
+            </a>
+            {% endif %}
+            <a href="{{ url_for('loyalty.edit_rewards_program', program_id=program.id) }}" class="btn btn-primary">
+                <i class="fas fa-pen me-1"></i>Edit
+            </a>
+        </div>
+    </div>
+
+    <div class="row g-4">
+        <div class="col-lg-6">
+            <div class="card h-100">
+                <div class="card-header bg-white"><strong>Program</strong></div>
+                <div class="card-body">
+                    <dl class="row mb-0">
+                        <dt class="col-sm-4">Website</dt><dd class="col-sm-8">{{ program.website or '(None)' }}</dd>
+                        <dt class="col-sm-4">Portal URL</dt
+                        ><dd class="col-sm-8">{{ program.portal_url or '(None)' }}</dd> <dt class="col-sm-4">Notes</dt
+                        ><dd class="col-sm-8">{{ program.notes or '(None)' }}</dd>
+                    </dl>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-6">
+            <div class="card h-100">
+                <div class="card-header bg-white"><strong>Your Account</strong></div>
+                <div class="card-body">
+                    {% set account = program.rewards_account %}
+                    <dl class="row mb-0">
+                        <dt class="col-sm-4">Membership Email</dt
+                        ><dd class="col-sm-8">{{ account.membership_email if account else '(None)' }}</dd>
+                        <dt class="col-sm-4">Membership Phone</dt
+                        ><dd class="col-sm-8">{{ account.membership_phone if account else '(None)' }}</dd>
+                        <dt class="col-sm-4">Portal Username</dt
+                        ><dd class="col-sm-8">{{ account.portal_username if account else '(None)' }}</dd>
+                        <dt class="col-sm-4">Account Number</dt
+                        ><dd class="col-sm-8">{{ account.account_number if account else '(None)' }}</dd>
+                        <dt class="col-sm-4">Tier</dt
+                        ><dd class="col-sm-8">{{ account.tier_name if account else '(None)' }}</dd>
+                        <dt class="col-sm-4">Notes</dt
+                        ><dd class="col-sm-8">{{ account.notes if account else '(None)' }}</dd>
+                    </dl>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card mt-4">
+        <div class="card-header bg-white d-flex justify-content-between align-items-center">
+            <strong>Linked Merchants</strong>
+            <span class="text-muted small">{{ linked_merchants|length }} linked</span>
+        </div>
+        <div class="card-body">
+            <form
+                method="post"
+                action="{{ url_for('loyalty.link_merchant_to_rewards_program', program_id=program.id) }}"
+                class="row g-2 align-items-end mb-3">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+                <div class="col-md-8 col-lg-6">
+                    <label for="merchant_id" class="form-label">Link Merchant</label>
+                    <select id="merchant_id" name="merchant_id" class="form-select">
+                        <option value="">Select a merchant</option>
+                        {% for merchant in available_merchants %}
+                        <option value="{{ merchant.id }}">{{ merchant.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-auto">
+                    <button type="submit" class="btn btn-outline-secondary">
+                        <i class="fas fa-link me-1"></i>Link Merchant
+                    </button>
+                </div>
+            </form>
+            {% if linked_merchants %}
+            <div class="d-flex flex-wrap gap-2">
+                {% for merchant in linked_merchants %}
+                <a
+                    href="{{ url_for('merchants.view_merchant', merchant_id=merchant.id) }}"
+                    class="btn btn-sm btn-outline-secondary d-inline-flex align-items-center gap-2">
+                    {% if merchant.favicon_url %}
+                    <img
+                        src="{{ url_for('static', filename='img/favicons/favicon-32x32.png') }}"
+                        data-favicon-url="{{ merchant.favicon_url }}"
+                        data-size="16"
+                        alt="{{ merchant.name }} icon"
+                        class="restaurant-favicon-table"
+                        width="16"
+                        height="16" />
+                    {% elif merchant.website %}
+                    <img
+                        src="{{ url_for('static', filename='img/favicons/favicon-32x32.png') }}"
+                        data-website="{{ merchant.website }}"
+                        data-size="16"
+                        alt="{{ merchant.name }} icon"
+                        class="restaurant-favicon-table"
+                        width="16"
+                        height="16" />
+                    {% else %}
+                    <i class="fas fa-building text-primary"></i>
+                    {% endif %}
+                    <span>{{ merchant.name }}</span>
+                </a>
+                {% endfor %}
+            </div>
+            {% else %}
+            <p class="text-muted mb-0">
+                No merchants linked yet. Use the selector above to link an existing merchant to this rewards program.
+            </p>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %} {% block scripts %} {{ super() }}
+<script type="module">
+    import { initializeRobustFaviconHandling } from "{{ url_for('static', filename='js/utils/robust-favicon-handler.js') }}";
+    initializeRobustFaviconHandling(".restaurant-favicon");
+    initializeRobustFaviconHandling(".restaurant-favicon-table");
+</script>
+{% endblock scripts %}

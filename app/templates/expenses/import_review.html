@@ -1,0 +1,1402 @@
+{% extends "base.html" %} {% block title %}Review Expense Import{% endblock title %} {% block main_container_class
+%}container-fluid px-2 px-md-3 px-xl-4{% endblock %} {% block styles %} {{ super() }}
+<link href="{{ url_for('static', filename='css/pages/expense-list.css') }}" rel="stylesheet" />
+{% endblock styles %} {% block section_header %}
+<div class="section-header-expenses">
+    <div class="section-title">
+        <i class="fas fa-receipt text-primary"></i>
+        <h1>Expenses</h1>
+    </div>
+    <ul class="nav nav-tabs section-tabs expenses-page-tabs mt-2" role="tablist">
+        <li class="nav-item" role="presentation">
+            <a class="nav-link" href="{{ url_for('expenses.list_expenses') }}">
+                <i class="fas fa-list me-1"></i>Expenses
+            </a>
+        </li>
+        <li class="nav-item" role="presentation">
+            <a class="nav-link active" href="{{ url_for('expenses.import_expenses') }}">
+                <i class="fas fa-file-import me-1"></i>Import
+            </a>
+        </li>
+    </ul>
+</div>
+{% endblock %} {% block head_extra %} {{ super() }}
+<style>
+    #main-content {
+        padding-left: 0.5rem !important;
+        padding-right: 0.5rem !important;
+    }
+
+    .import-review-page {
+        width: 100%;
+        padding-left: 0;
+        padding-right: 0;
+    }
+
+    .import-review-table {
+        min-width: 1320px;
+    }
+
+    .import-review-table th:nth-child(1),
+    .import-review-table td:nth-child(1) {
+        width: 90px;
+    }
+
+    .import-review-table th:nth-child(2),
+    .import-review-table td:nth-child(2) {
+        min-width: 340px;
+    }
+
+    .import-review-table th:nth-child(3),
+    .import-review-table td:nth-child(3) {
+        min-width: 420px;
+    }
+
+    .import-review-table th:nth-child(4),
+    .import-review-table td:nth-child(4) {
+        min-width: 320px;
+    }
+
+    .import-review-card,
+    .import-review-panel,
+    .import-review-status-panel,
+    .import-review-compare-card,
+    .import-review-choice-card {
+        border: 1px solid #e9ecef;
+        border-radius: 0.75rem;
+        background: #fff;
+    }
+
+    .import-review-compare-card,
+    .import-review-choice-card,
+    .import-review-status-panel {
+        padding: 0.75rem;
+    }
+
+    .import-review-panel {
+        padding: 0.65rem;
+    }
+
+    .import-review-section-title {
+        font-size: 0.78rem;
+        font-weight: 700;
+        color: #6c757d;
+        text-transform: uppercase;
+        letter-spacing: 0.03em;
+        margin-bottom: 0.45rem;
+    }
+
+    .import-review-choice-stack {
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+    }
+
+    .import-review-choice-card.is-muted {
+        opacity: 0.58;
+    }
+
+    .import-review-status-panel.skip {
+        background: #fff5f5;
+        border-color: #f5c2c7;
+    }
+
+    .import-review-status-panel.create {
+        background: #f0fff4;
+        border-color: #badbcc;
+    }
+
+    .import-review-status-panel.update {
+        background: #eef6ff;
+        border-color: #b6d4fe;
+    }
+
+    .import-review-chip-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.35rem;
+        margin-bottom: 0.5rem;
+    }
+
+    .import-review-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+        border-radius: 999px;
+        padding: 0.3rem 0.6rem;
+        font-size: 0.75rem;
+        font-weight: 700;
+        line-height: 1;
+        border: 1px solid transparent;
+    }
+
+    .import-review-chip.skip {
+        background: #f8d7da;
+        color: #842029;
+        border-color: #f1aeb5;
+    }
+
+    .import-review-chip.create {
+        background: #d1e7dd;
+        color: #0f5132;
+        border-color: #a3cfbb;
+    }
+
+    .import-review-chip.update {
+        background: #cfe2ff;
+        color: #084298;
+        border-color: #9ec5fe;
+    }
+
+    .import-review-chip.match {
+        background: #e8f7ee;
+        color: #146c43;
+        border-color: #a3cfbb;
+    }
+
+    .import-review-chip.create-restaurant {
+        background: #fff3cd;
+        color: #997404;
+        border-color: #ffecb5;
+    }
+
+    .import-review-chip.blocked {
+        background: #f8d7da;
+        color: #842029;
+        border-color: #f1aeb5;
+    }
+
+    .import-review-compare-grid {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+        gap: 0.75rem;
+    }
+
+    .import-review-compare-fields {
+        display: grid;
+        grid-template-columns: auto minmax(0, 1fr);
+        gap: 0.25rem 0.55rem;
+    }
+
+    .import-review-compare-label {
+        font-size: 0.76rem;
+        color: #6c757d;
+        font-weight: 700;
+    }
+
+    .import-review-compare-value {
+        font-size: 0.84rem;
+        font-weight: 700;
+        line-height: 1.45;
+    }
+
+    .import-review-compare-value.match {
+        color: #212529;
+    }
+
+    .import-review-compare-value.unchanged {
+        color: #c4c9cf;
+    }
+
+    .import-review-compare-value.add {
+        color: #198754;
+    }
+
+    .import-review-compare-value.update {
+        color: #0d6efd;
+    }
+
+    .import-review-legend {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.65rem;
+    }
+
+    .import-review-legend-item {
+        font-size: 0.84rem;
+        font-weight: 700;
+    }
+
+    .import-review-compare-card-title {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 0.5rem;
+        margin-bottom: 0.5rem;
+    }
+
+    .import-review-inline-list {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.35rem;
+    }
+
+    .import-review-card-actions {
+        margin-top: 0.75rem;
+        padding-top: 0.65rem;
+        border-top: 1px solid #f1f3f5;
+    }
+
+    .import-review-tag-list {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.45rem;
+        margin-top: 0.35rem;
+    }
+
+    .import-review-tag-item {
+        font-size: 0.82rem;
+        font-weight: 700;
+    }
+
+    .import-review-update-preview {
+        display: flex;
+        flex-direction: column;
+        gap: 0.2rem;
+    }
+
+    .import-review-update-line {
+        font-size: 0.82rem;
+        font-weight: 600;
+    }
+
+    .import-review-row-status {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+        border-radius: 999px;
+        padding: 0.2rem 0.55rem;
+        font-size: 0.75rem;
+        font-weight: 700;
+        line-height: 1;
+        border: 1px solid transparent;
+    }
+
+    .import-review-row-status.ready {
+        color: #146c43;
+        background: #e8f7ee;
+        border-color: #a3cfbb;
+    }
+
+    .import-review-row-status.review {
+        color: #664d03;
+        background: #fff3cd;
+        border-color: #ffe69c;
+    }
+
+    .import-review-row-status.skipped {
+        color: #6c757d;
+        background: #f8f9fa;
+        border-color: #dee2e6;
+    }
+
+    .import-review-row-status.blocked {
+        color: #842029;
+        background: #f8d7da;
+        border-color: #f1aeb5;
+    }
+
+    .import-review-panel.is-hidden {
+        display: none;
+    }
+
+    @media (max-width: 1200px) {
+        .import-review-compare-grid {
+            grid-template-columns: 1fr;
+        }
+    }
+</style>
+{% endblock head_extra %} {% block content %}
+<div class="import-review-page mt-4">
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+        <div>
+            <h1 class="h3 mb-1">Review Expense Import</h1>
+            <p class="text-muted mb-0">
+                Review each row using the selected action. Recommended actions are shown for rows with a likely match.
+            </p>
+        </div>
+        <div class="d-flex gap-2">
+            <a href="{{ url_for('expenses.import_expenses', new=1) }}" class="btn btn-outline-secondary">
+                <i class="fas fa-arrow-left me-1"></i>Back to Upload
+            </a>
+            <a href="{{ url_for('expenses.list_expenses') }}" class="btn btn-outline-secondary">
+                <i class="fas fa-list me-1"></i>Expenses
+            </a>
+        </div>
+    </div>
+
+    <div class="card mb-3">
+        <div class="card-body py-2">
+            <div class="import-review-legend">
+                <span class="import-review-legend-item import-review-compare-value unchanged">Skipped</span>
+                <span class="import-review-legend-item import-review-compare-value match">Match</span>
+                <span class="import-review-legend-item import-review-compare-value update">Updated</span>
+                <span class="import-review-legend-item import-review-compare-value add">New</span>
+            </div>
+        </div>
+    </div>
+
+    {% if errors %}
+    <div class="alert alert-danger">
+        <h5 class="alert-heading">Import Review Errors</h5>
+        <ul class="mb-0">
+            {% for error in errors %}
+            <li>{{ error }}</li>
+            {% endfor %}
+        </ul>
+    </div>
+    {% endif %}
+
+    <form method="post" action="{{ url_for('expenses.import_expenses') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+        <input type="hidden" name="review_action" value="apply" />
+
+        <div class="card import-review-card">
+            <div class="card-header bg-white d-flex flex-wrap justify-content-between align-items-center gap-2">
+                <div class="fw-semibold">Expense Reconciliation</div>
+                <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-file-import me-1"></i>Apply Import Actions
+                </button>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0 align-middle import-review-table">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Row</th>
+                                <th>Imported Expense</th>
+                                <th>Existing Expense / Comparison</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for row in review_rows %} {% set duplicate_count = row.duplicate_candidates|length %} {%
+                            set suggested_restaurant = row.restaurant_candidates[0] if row.restaurant_candidates else
+                            None %} {% set preview_duplicate = row.duplicate_candidates[0] if row.duplicate_candidates
+                            else None %} {% set preview_comparison = preview_duplicate.get('comparison') if
+                            preview_duplicate else None %}
+                            <tr
+                                data-row-number="{{ row.row_number }}"
+                                data-duplicate-candidates-by-restaurant="{{ row.get('duplicate_candidates_by_restaurant', {})|tojson|forceescape }}"
+                                data-all-duplicate-candidates="{{ row.get('all_duplicate_candidates', [])|tojson|forceescape }}">
+                                <td>
+                                    <div class="fw-semibold">#{{ row.row_number }}</div>
+                                    <span
+                                        class="import-review-row-status {% if row.error_messages %}blocked{% elif row.expense_default_action == 'skip' %}skipped{% elif row.expense_default_action == 'update' %}review{% else %}ready{% endif %}"
+                                        id="row_status_{{ row.row_number }}">
+                                        {% if row.error_messages %} Blocked {% elif row.expense_default_action == 'skip'
+                                        %} Skipped {% elif row.expense_default_action == 'update' %} Update {% else %}
+                                        Create {% endif %}
+                                    </span>
+                                </td>
+                                <td>
+                                    <div class="import-review-compare-card">
+                                        <div class="import-review-section-title">Imported Expense</div>
+                                        <div class="small text-muted mb-2">
+                                            Source: {{ 'Simplifi CSV' if row.import_source_type == 'simplifi' else 'Standard CSV' }}
+                                        </div>
+                                        {% if preview_comparison and preview_comparison.fields %}
+                                        <div
+                                            class="import-review-compare-fields"
+                                            id="imported_fields_{{ row.row_number }}">
+                                            {% for field in preview_comparison.fields %}
+                                            <div class="import-review-compare-label">{{ field.field }}</div>
+                                            <div
+                                                class="import-review-compare-value {% if row.expense_default_action == 'skip' %}unchanged{% elif row.expense_default_action == 'create' %}{% if field.new and field.new != 'Not provided' %}add{% else %}unchanged{% endif %}{% else %}{{ field.status }}{% endif %}">
+                                                {{ field.new if field.new and field.new != 'Not provided' else '(None)'
+                                                }}
+                                            </div>
+                                            {% endfor %}
+                                        </div>
+                                        {% else %}
+                                        <div
+                                            class="import-review-compare-fields"
+                                            id="imported_fields_{{ row.row_number }}">
+                                            <div class="import-review-compare-label">Visit Date</div>
+                                            <div class="import-review-compare-value add"
+                                                >{{ row.parsed_visit_date or '(None)' }}</div
+                                            >
+
+                                            <div class="import-review-compare-label">Time</div>
+                                            <div
+                                                class="import-review-compare-value {% if row.parsed_time_display %}add{% else %}unchanged{% endif %}">
+                                                {{ row.parsed_time_display or '(None)' }}
+                                            </div>
+
+                                            <div class="import-review-compare-label">Cleared Date</div>
+                                            <div
+                                                class="import-review-compare-value {% if row.parsed_cleared_date %}add{% else %}unchanged{% endif %}">
+                                                {{ row.parsed_cleared_date or '(None)' }}
+                                            </div>
+
+                                            <div class="import-review-compare-label">Amount</div>
+                                            <div
+                                                class="import-review-compare-value {% if row.amount %}add{% else %}unchanged{% endif %}">
+                                                {% if row.amount %}${{ row.amount }}{% else %}(None){% endif %}
+                                            </div>
+
+                                            <div class="import-review-compare-label">Restaurant</div>
+                                            <div
+                                                class="import-review-compare-value {% if row.restaurant_name %}add{% else %}unchanged{% endif %}">
+                                                {{ row.restaurant_name or '(None)' }}
+                                            </div>
+
+                                            <div class="import-review-compare-label">Expense category</div>
+                                            <div
+                                                class="import-review-compare-value {% if row.category_name %}add{% else %}unchanged{% endif %}">
+                                                {{ row.category_name or '(None)' }}
+                                            </div>
+
+                                            <div class="import-review-compare-label">Meal type</div>
+                                            <div
+                                                class="import-review-compare-value {% if row.meal_type %}add{% else %}unchanged{% endif %}">
+                                                {{ row.meal_type or '(None)' }}
+                                            </div>
+
+                                            <div class="import-review-compare-label">Order type</div>
+                                            <div
+                                                class="import-review-compare-value {% if row.order_type %}add{% else %}unchanged{% endif %}">
+                                                {{ row.order_type or '(None)' }}
+                                            </div>
+
+                                            <div class="import-review-compare-label">Party size</div>
+                                            <div
+                                                class="import-review-compare-value {% if row.party_size %}add{% else %}unchanged{% endif %}">
+                                                {{ row.party_size or '(None)' }}
+                                            </div>
+
+                                            <div class="import-review-compare-label">Notes</div>
+                                            <div
+                                                class="import-review-compare-value {% if row.notes %}add{% else %}unchanged{% endif %}">
+                                                {{ row.notes or '(None)' }}
+                                            </div>
+
+                                            <div class="import-review-compare-label">Tags</div>
+                                            <div
+                                                class="import-review-compare-value {% if row.tags %}add{% else %}unchanged{% endif %}">
+                                                {{ row.tags or '(None)' }}
+                                            </div>
+                                        </div>
+                                        {% endif %} {% if row.error_messages %}
+                                        <ul class="small text-danger mt-2 mb-0 ps-3">
+                                            {% for error in row.error_messages %}
+                                            <li>{{ error }}</li>
+                                            {% endfor %}
+                                        </ul>
+                                        {% endif %}
+                                        {% if row.warning_messages %}
+                                        <ul class="small text-warning mt-2 mb-0 ps-3">
+                                            {% for warning in row.warning_messages %}
+                                            <li>{{ warning }}</li>
+                                            {% endfor %}
+                                        </ul>
+                                        {% endif %}
+                                        <div class="mt-3">
+                                            <div class="import-review-section-title">Import Restaurant Info</div>
+                                            <div class="import-review-compare-fields">
+                                                <div class="import-review-compare-label">Payee</div>
+                                                <div
+                                                    class="import-review-compare-value {% if row.restaurant_name %}add{% else %}unchanged{% endif %}">
+                                                    {{ row.restaurant_name or '(None)' }}
+                                                </div>
+
+                                                <div class="import-review-compare-label">Address</div>
+                                                <div
+                                                    class="import-review-compare-value {% if row.restaurant_address %}add{% else %}unchanged{% endif %}">
+                                                    {{ row.restaurant_address or '(None)' }}
+                                                </div>
+
+                                                <div class="import-review-compare-label">City</div>
+                                                <div
+                                                    class="import-review-compare-value {% if row.restaurant_city %}add{% else %}unchanged{% endif %}">
+                                                    {{ row.restaurant_city or '(None)' }}
+                                                </div>
+
+                                                <div class="import-review-compare-label">State</div>
+                                                <div
+                                                    class="import-review-compare-value {% if row.restaurant_state %}add{% else %}unchanged{% endif %}">
+                                                    {{ row.restaurant_state or '(None)' }}
+                                                </div>
+
+                                                <div class="import-review-compare-label">Postal code</div>
+                                                <div
+                                                    class="import-review-compare-value {% if row.restaurant_postal_code %}add{% else %}unchanged{% endif %}">
+                                                    {{ row.restaurant_postal_code or '(None)' }}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td>
+                                    <div class="import-review-compare-card">
+                                        <div class="import-review-compare-card-title">
+                                            <div class="import-review-section-title mb-0">Existing Expense</div>
+                                        </div>
+                                        <div
+                                            class="import-review-compare-fields"
+                                            id="existing_fields_{{ row.row_number }}">
+                                            {% if preview_comparison and preview_comparison.fields %}
+                                            {% for field in preview_comparison.fields %}
+                                            <div class="import-review-compare-label">{{ field.field }}</div>
+                                            <div
+                                                class="import-review-compare-value {% if row.expense_default_action == 'skip' %}unchanged{% elif row.expense_default_action == 'create' %}unchanged{% else %}{{ field.status }}{% endif %}">
+                                                {{ field.current if field.current and field.current != 'Not provided'
+                                                else '(None)' }}
+                                            </div>
+                                            {% endfor %}
+                                            {% else %}
+                                            <div class="small text-muted">
+                                                {% if row.restaurant_candidates %}
+                                                Choose or confirm the restaurant to identify any matching expenses.
+                                                {% else %}
+                                                No likely duplicate expenses found.
+                                                {% endif %}
+                                            </div>
+                                            {% endif %}
+                                        </div>
+                                        <div class="mt-3">
+                                            <div class="import-review-section-title">Restaurant Match</div>
+                                            {% if suggested_restaurant %}
+                                            <div
+                                                class="import-review-compare-fields"
+                                                id="restaurant_match_fields_{{ row.row_number }}">
+                                                <div class="import-review-compare-label">Display name</div>
+                                                <div
+                                                    class="import-review-compare-value {% if suggested_restaurant and suggested_restaurant.display_name %}match{% else %}unchanged{% endif %}">
+                                                    {{ suggested_restaurant.display_name if suggested_restaurant and
+                                                    suggested_restaurant.display_name else '(None)' }}
+                                                </div>
+
+                                                <div class="import-review-compare-label">Restaurant name</div>
+                                                <div
+                                                    class="import-review-compare-value {% if suggested_restaurant and suggested_restaurant.name %}match{% else %}unchanged{% endif %}">
+                                                    {{ suggested_restaurant.name if suggested_restaurant and
+                                                    suggested_restaurant.name else '(None)' }}
+                                                </div>
+
+                                                <div class="import-review-compare-label">Address</div>
+                                                <div
+                                                    class="import-review-compare-value {% if suggested_restaurant and suggested_restaurant.address %}match{% else %}unchanged{% endif %}">
+                                                    {{ suggested_restaurant.address if suggested_restaurant and
+                                                    suggested_restaurant.address else '(None)' }}
+                                                </div>
+
+                                                <div class="import-review-compare-label">City</div>
+                                                <div
+                                                    class="import-review-compare-value {% if suggested_restaurant and suggested_restaurant.city %}match{% else %}unchanged{% endif %}">
+                                                    {{ suggested_restaurant.city if suggested_restaurant and
+                                                    suggested_restaurant.city else '(None)' }}
+                                                </div>
+
+                                                <div class="import-review-compare-label">State</div>
+                                                <div
+                                                    class="import-review-compare-value {% if suggested_restaurant and suggested_restaurant.state %}match{% else %}unchanged{% endif %}">
+                                                    {{ suggested_restaurant.state if suggested_restaurant and
+                                                    suggested_restaurant.state else '(None)' }}
+                                                </div>
+
+                                                <div class="import-review-compare-label">Postal code</div>
+                                                <div
+                                                    class="import-review-compare-value {% if suggested_restaurant and suggested_restaurant.postal_code %}match{% else %}unchanged{% endif %}">
+                                                    {{ suggested_restaurant.postal_code if suggested_restaurant and
+                                                    suggested_restaurant.postal_code else '(None)' }}
+                                                </div>
+                                            </div>
+                                            {% elif row.restaurant_candidates %}
+                                            <div
+                                                class="import-review-compare-fields"
+                                                id="restaurant_match_fields_{{ row.row_number }}">
+                                                <div class="small text-muted">
+                                                    Select a restaurant to preview its existing details here.
+                                                </div>
+                                            </div>
+                                            {% else %}
+                                            <div
+                                                class="import-review-compare-fields"
+                                                id="restaurant_match_fields_{{ row.row_number }}">
+                                                <div class="small text-muted">No matching restaurant was found.</div>
+                                            </div>
+                                            {% endif %}
+                                        </div>
+                                        <div
+                                            class="import-review-panel mt-3 {% if not row.duplicate_candidates %}is-hidden{% endif %}"
+                                            id="expense_match_panel_{{ row.row_number }}">
+                                            <label
+                                                for="update_expense_id_{{ row.row_number }}"
+                                                class="form-label small text-muted"
+                                                >Existing expense</label
+                                            >
+                                            <select
+                                                class="form-select form-select-sm"
+                                                id="update_expense_id_{{ row.row_number }}"
+                                                name="update_expense_id_{{ row.row_number }}">
+                                                {% for duplicate in row.duplicate_candidates %} {% set
+                                                duplicate_comparison = duplicate.get('comparison') %}
+                                                <option
+                                                    value="{{ duplicate.id }}"
+                                                    data-comparison="{{ duplicate_comparison|tojson|forceescape if duplicate_comparison else '' }}"
+                                                    data-label="{{ duplicate.date }} • ${{ duplicate.amount }}">
+                                                    {{ duplicate.date }} • ${{ duplicate.amount }}
+                                                </option>
+                                                {% endfor %}
+                                            </select>
+                                        </div>
+                                        <div class="import-review-inline-list import-review-card-actions">
+                                            <a
+                                                href="{{ suggested_restaurant.detail_url if suggested_restaurant else '#' }}"
+                                                class="btn btn-sm btn-outline-secondary"
+                                                id="open_restaurant_link_{{ row.row_number }}"
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                onclick="
+                                                    if (this.getAttribute('href') === '#') {
+                                                        return false;
+                                                    }
+                                                    window.open(this.href, '_blank', 'noopener,noreferrer');
+                                                    return false;
+                                                ">
+                                                <i class="fas fa-up-right-from-square me-1"></i>View Restaurant
+                                            </a>
+                                            <a
+                                                href="{{ preview_duplicate.detail_url if preview_duplicate else '#' }}"
+                                                class="btn btn-sm btn-outline-secondary"
+                                                id="open_expense_link_{{ row.row_number }}"
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                onclick="
+                                                    if (this.getAttribute('href') === '#') {
+                                                        return false;
+                                                    }
+                                                    window.open(this.href, '_blank', 'noopener,noreferrer');
+                                                    return false;
+                                                ">
+                                                <i class="fas fa-up-right-from-square me-1"></i>View Expense
+                                            </a>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td>
+                                    <div class="import-review-choice-stack">
+                                        <div
+                                            class="import-review-choice-card"
+                                            id="expense_choice_card_{{ row.row_number }}">
+                                            <div class="import-review-section-title">2. Reconcile Expense</div>
+                                            <label
+                                                for="expense_action_{{ row.row_number }}"
+                                                class="form-label small text-muted"
+                                                >Expense action</label
+                                            >
+                                            <select
+                                                class="form-select"
+                                                id="expense_action_{{ row.row_number }}"
+                                                name="expense_action_{{ row.row_number }}"
+                                                data-row-number="{{ row.row_number }}">
+                                                <option
+                                                    value="skip"
+                                                    {% if row.expense_default_action == 'skip' %}selected{% endif %}
+                                                    >Skip expense</option
+                                                >
+                                                <option
+                                                    value="update"
+                                                    {% if row.expense_default_action == 'update' %}selected{% endif %}
+                                                    >Update existing expense</option
+                                                >
+                                                <option
+                                                    value="create"
+                                                    {% if row.expense_default_action == 'create' %}selected{% endif %}
+                                                    >Create new expense</option
+                                                >
+                                            </select>
+                                            <div class="small mt-2">
+                                                <span class="text-muted">Recommended action:</span>
+                                                <span class="fw-semibold">
+                                                    {% if row.expense_default_action == 'update' %} Update existing
+                                                    expense {% elif row.expense_default_action == 'skip' and
+                                                    duplicate_count %} Skip expense {% else %} Create new expense {%
+                                                    endif %}
+                                                </span>
+                                            </div>
+                                        </div>
+
+                                        <div
+                                            class="import-review-choice-card"
+                                            id="restaurant_choice_card_{{ row.row_number }}">
+                                            <div class="import-review-section-title">1. Reconcile Restaurant</div>
+                                            <label
+                                                for="restaurant_action_{{ row.row_number }}"
+                                                class="form-label small text-muted"
+                                                >Restaurant action</label
+                                            >
+                                            <select
+                                                class="form-select"
+                                                id="restaurant_action_{{ row.row_number }}"
+                                                name="restaurant_action_{{ row.row_number }}"
+                                                data-row-number="{{ row.row_number }}">
+                                                <option
+                                                    value="match"
+                                                    {% if row.restaurant_default_action == 'match' %}selected{% endif %}
+                                                    >Match existing restaurant</option
+                                                >
+                                            </select>
+
+                                            <div class="import-review-panel mt-2" id="match_panel_{{ row.row_number }}">
+                                                {% if row.restaurant_candidates %}
+                                                <div class="small text-muted mb-2">
+                                                    {% if row.restaurant_requires_confirmation %}
+                                                    Multiple restaurant matches were found. Confirm the correct one
+                                                    before choosing an expense.
+                                                    {% else %}
+                                                    Suggested restaurant match shown first.
+                                                    {% endif %}
+                                                </div>
+                                                {% endif %}
+                                                <label
+                                                    for="restaurant_id_{{ row.row_number }}"
+                                                    class="form-label small text-muted"
+                                                    >Match to restaurant</label
+                                                >
+                                                <select
+                                                    class="form-select"
+                                                    id="restaurant_id_{{ row.row_number }}"
+                                                    name="restaurant_id_{{ row.row_number }}"
+                                                    data-row-number="{{ row.row_number }}">
+                                                    <option value="">Select a restaurant</option>
+                                                    {% if row.restaurant_candidates %}
+                                                    <optgroup label="Suggested matches">
+                                                        {% for candidate in row.restaurant_candidates %}
+                                                        <option
+                                                            value="{{ candidate.id }}"
+                                                            data-detail-url="{{ candidate.detail_url }}"
+                                                            data-display-name="{{ candidate.display_name }}"
+                                                            data-name="{{ candidate.name }}"
+                                                            data-address="{{ candidate.address }}"
+                                                            data-city="{{ candidate.city }}"
+                                                            data-state="{{ candidate.state }}"
+                                                            data-postal-code="{{ candidate.postal_code }}"
+                                                            {% if row.suggested_restaurant_id == candidate.id %}selected{% endif %}>
+                                                            {{ candidate.display_name }}{% if candidate.match_basis %}
+                                                            • {{ candidate.match_basis }}{% endif %}
+                                                        </option>
+                                                        {% endfor %}
+                                                    </optgroup>
+                                                    {% endif %}
+                                                    <optgroup label="All restaurants">
+                                                    {% for restaurant in all_restaurants %}
+                                                    <option
+                                                        value="{{ restaurant.id }}"
+                                                        data-detail-url="{{ url_for('restaurants.restaurant_details', restaurant_id=restaurant.id, _external=True) }}"
+                                                        data-display-name="{{ restaurant.display_name }}"
+                                                        data-name="{{ restaurant.name }}"
+                                                        data-address="{{ restaurant.address or '' }}"
+                                                        data-city="{{ restaurant.city or '' }}"
+                                                        data-state="{{ restaurant.state or '' }}"
+                                                        data-postal-code="{{ restaurant.postal_code or '' }}"
+                                                        {% if row.suggested_restaurant_id == restaurant.id %}selected{% endif %}>
+                                                        {{ restaurant.display_name }}
+                                                    </option>
+                                                    {% endfor %}
+                                                    </optgroup>
+                                                </select>
+                                                <div class="mt-2">
+                                                    <a
+                                                        href="{{ url_for('restaurants.add_restaurant', name=row.restaurant_name, address_line_1=row.restaurant_address, city=row.restaurant_city, state=row.restaurant_state, postal_code=row.restaurant_postal_code, notes=row.notes) }}"
+                                                        class="btn btn-sm btn-outline-primary"
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        onclick="
+                                                            window.open(this.href, '_blank', 'noopener,noreferrer');
+                                                            return false;
+                                                        ">
+                                                        <i class="fas fa-up-right-from-square me-1"></i>Create
+                                                        Restaurant
+                                                    </a>
+                                                    <div class="small text-muted mt-2">
+                                                        If no match exists, create the restaurant in a new tab, then
+                                                        return here and select it from the list.
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div class="import-review-status-panel" id="status_panel_{{ row.row_number }}">
+                                            <div
+                                                class="import-review-chip-row"
+                                                id="action_chips_{{ row.row_number }}"></div>
+                                            <div class="fw-semibold" id="action_summary_{{ row.row_number }}"></div>
+                                            <div
+                                                class="import-review-update-preview mt-2"
+                                                id="update_preview_{{ row.row_number }}"></div>
+                                            <div
+                                                class="import-review-tag-list"
+                                                id="tag_preview_{{ row.row_number }}"></div>
+                                            {% if row.tag_count %}
+                                            <div class="small text-muted mt-2">
+                                                Tags: {% if row.tag_existing_count %}matches {{
+                                                row.tag_existing_names|join(", ") }}{% endif %} {% if
+                                                row.tag_existing_count and row.tag_new_count %} • {% endif %} {% if
+                                                row.tag_new_count %}creates {{ row.tag_new_names|join(", ") }}{% endif
+                                                %}
+                                            </div>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="card-footer bg-white d-flex justify-content-between align-items-center">
+                <span class="text-muted small">Rows apply according to their selected action.</span>
+                <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-file-import me-1"></i>Apply Import Actions
+                </button>
+            </div>
+        </div>
+    </form>
+</div>
+{% endblock content %} {% block extra_js %}
+<script>
+    document.addEventListener("DOMContentLoaded", function () {
+        function getRowElements(rowNumber) {
+            return {
+                expenseAction: document.getElementById("expense_action_" + rowNumber),
+                restaurantAction: document.getElementById("restaurant_action_" + rowNumber),
+                restaurantMatchPanel: document.getElementById("match_panel_" + rowNumber),
+                restaurantSelect: document.getElementById("restaurant_id_" + rowNumber),
+                restaurantMatchFields: document.getElementById("restaurant_match_fields_" + rowNumber),
+                expenseSelect: document.getElementById("update_expense_id_" + rowNumber),
+                expenseMatchPanel: document.getElementById("expense_match_panel_" + rowNumber),
+                existingFields: document.getElementById("existing_fields_" + rowNumber),
+                importedFields: document.getElementById("imported_fields_" + rowNumber),
+                openExpenseLink: document.getElementById("open_expense_link_" + rowNumber),
+                openRestaurantLink: document.getElementById("open_restaurant_link_" + rowNumber),
+                actionSummary: document.getElementById("action_summary_" + rowNumber),
+                actionChips: document.getElementById("action_chips_" + rowNumber),
+                tagPreview: document.getElementById("tag_preview_" + rowNumber),
+                statusPanel: document.getElementById("status_panel_" + rowNumber),
+                expenseChoiceCard: document.getElementById("expense_choice_card_" + rowNumber),
+                restaurantChoiceCard: document.getElementById("restaurant_choice_card_" + rowNumber),
+                rowStatus: document.getElementById("row_status_" + rowNumber),
+            };
+        }
+
+        function getDisplayFieldStatus(field, mode, expenseAction) {
+            if (expenseAction === "skip") {
+                return "unchanged";
+            }
+
+            if (expenseAction === "create") {
+                if (mode === "current") {
+                    return "unchanged";
+                }
+                const newValue = field.new;
+                return !newValue || newValue === "Not provided" ? "unchanged" : "add";
+            }
+
+            if (expenseAction === "update") {
+                if (field.status === "match") {
+                    return "match";
+                }
+                if (field.status === "unchanged") {
+                    return "unchanged";
+                }
+                if (field.status === "add") {
+                    return mode === "new" ? "add" : "unchanged";
+                }
+                return "update";
+            }
+
+            return field.status || "unchanged";
+        }
+
+        function buildComparisonFields(fields, mode, expenseAction) {
+            if (!fields || !fields.length) {
+                return '<div class="small text-muted">No comparison available.</div>';
+            }
+
+            return fields
+                .map(function (field) {
+                    let value = mode === "current" ? field.current : field.new;
+                    if (mode === "current" && (!value || value === "Not provided")) {
+                        value = "(None)";
+                    }
+                    if (mode === "new" && (!value || value === "Not provided")) {
+                        value = "(None)";
+                    }
+                    const status = getDisplayFieldStatus(field, mode, expenseAction);
+                    return (
+                        '<div class="import-review-compare-label">' +
+                        field.field +
+                        '</div><div class="import-review-compare-value ' +
+                        status +
+                        '">' +
+                        value +
+                        "</div>"
+                    );
+                })
+                .join("");
+        }
+
+        function buildTagPreview(comparison, expenseAction) {
+            if (!comparison || !comparison.fields) {
+                return "";
+            }
+
+            const tagsField = comparison.fields.find(function (field) {
+                return field.field === "Tags";
+            });
+            if (!tagsField) {
+                return "";
+            }
+
+            function splitTags(raw) {
+                if (!raw || raw === "Not provided" || raw === "(None)") {
+                    return [];
+                }
+                return raw
+                    .split(",")
+                    .map(function (tag) {
+                        return tag.trim();
+                    })
+                    .filter(Boolean);
+            }
+
+            const currentTags = splitTags(tagsField.current);
+            const newTags = splitTags(tagsField.new);
+            const currentSet = new Set(currentTags);
+            const newSet = new Set(newTags);
+            const tagItems = [];
+
+            if (expenseAction === "skip") {
+                return currentTags
+                    .concat(
+                        newTags.filter(function (tag) {
+                            return !currentSet.has(tag);
+                        })
+                    )
+                    .map(function (tag) {
+                        return (
+                            '<span class="import-review-tag-item import-review-compare-value unchanged">' +
+                            tag +
+                            "</span>"
+                        );
+                    })
+                    .join("");
+            }
+
+            if (expenseAction === "create") {
+                return newTags
+                    .map(function (tag) {
+                        return (
+                            '<span class="import-review-tag-item import-review-compare-value add">' + tag + "</span>"
+                        );
+                    })
+                    .join("");
+            }
+
+            newTags.forEach(function (tag) {
+                if (newSet.has(tag)) {
+                    tagItems.push(
+                        '<span class="import-review-tag-item import-review-compare-value ' +
+                            (currentSet.has(tag) ? "match" : "add") +
+                            '">' +
+                            tag +
+                            "</span>"
+                    );
+                }
+            });
+
+            currentTags.forEach(function (tag) {
+                if (!newSet.has(tag)) {
+                    tagItems.push(
+                        '<span class="import-review-tag-item import-review-compare-value update">' + tag + "</span>"
+                    );
+                } else {
+                    return;
+                }
+            });
+
+            return tagItems.join("");
+        }
+
+        function getRowContainer(rowNumber) {
+            return document.querySelector("tr[data-row-number='" + rowNumber + "']");
+        }
+
+        function getDuplicateCandidatesByRestaurant(rowNumber) {
+            const row = getRowContainer(rowNumber);
+            if (!row) {
+                return {};
+            }
+            const raw = row.dataset.duplicateCandidatesByRestaurant || "{}";
+            try {
+                return JSON.parse(raw);
+            } catch (_error) {
+                return {};
+            }
+        }
+
+        function getAllDuplicateCandidates(rowNumber) {
+            const row = getRowContainer(rowNumber);
+            if (!row) {
+                return [];
+            }
+            const raw = row.dataset.allDuplicateCandidates || "[]";
+            try {
+                return JSON.parse(raw);
+            } catch (_error) {
+                return [];
+            }
+        }
+
+        function getSelectedRestaurantOption(elements) {
+            if (!(elements.restaurantSelect instanceof HTMLSelectElement)) {
+                return null;
+            }
+            return elements.restaurantSelect.options[elements.restaurantSelect.selectedIndex] || null;
+        }
+
+        function getSelectedRestaurantDisplayName(elements) {
+            const selectedOption = getSelectedRestaurantOption(elements);
+            if (!selectedOption || !selectedOption.value) {
+                return "";
+            }
+            return (selectedOption.dataset.displayName || selectedOption.textContent || "").trim();
+        }
+
+        function renderRestaurantMatch(rowNumber) {
+            const elements = getRowElements(rowNumber);
+            if (!elements.restaurantMatchFields) {
+                return;
+            }
+
+            const selectedOption = getSelectedRestaurantOption(elements);
+            if (!selectedOption || !selectedOption.value) {
+                elements.restaurantMatchFields.innerHTML =
+                    '<div class="small text-muted">Select a restaurant to preview its existing details here.</div>';
+                return;
+            }
+
+            const fields = [
+                { label: "Display name", value: selectedOption.dataset.displayName || "" },
+                { label: "Restaurant name", value: selectedOption.dataset.name || "" },
+                { label: "Address", value: selectedOption.dataset.address || "" },
+                { label: "City", value: selectedOption.dataset.city || "" },
+                { label: "State", value: selectedOption.dataset.state || "" },
+                { label: "Postal code", value: selectedOption.dataset.postalCode || "" },
+            ];
+
+            elements.restaurantMatchFields.innerHTML = fields
+                .map(function (field) {
+                    const hasValue = Boolean(field.value && field.value.trim());
+                    return (
+                        '<div class="import-review-compare-label">' +
+                        field.label +
+                        '</div><div class="import-review-compare-value ' +
+                        (hasValue ? "match" : "unchanged") +
+                        '">' +
+                        (hasValue ? field.value : "(None)") +
+                        "</div>"
+                    );
+                })
+                .join("");
+        }
+
+        function getDuplicateCandidatesForSelection(rowNumber, restaurantId) {
+            const duplicatesByRestaurant = getDuplicateCandidatesByRestaurant(rowNumber);
+            if (!restaurantId || !duplicatesByRestaurant[restaurantId]) {
+                return [];
+            }
+            return duplicatesByRestaurant[restaurantId];
+        }
+
+        function populateExpenseOptions(rowNumber) {
+            const elements = getRowElements(rowNumber);
+            if (!(elements.expenseSelect instanceof HTMLSelectElement)) {
+                return [];
+            }
+
+            const restaurantId =
+                elements.restaurantSelect instanceof HTMLSelectElement ? elements.restaurantSelect.value : "";
+            const selectedRestaurantDisplayName = getSelectedRestaurantDisplayName(elements);
+            let candidates = getDuplicateCandidatesForSelection(rowNumber, restaurantId);
+            if (!candidates.length && selectedRestaurantDisplayName) {
+                candidates = getAllDuplicateCandidates(rowNumber).filter(function (candidate) {
+                    return (candidate.restaurant_name || "").trim() === selectedRestaurantDisplayName;
+                });
+            }
+            const currentValue = elements.expenseSelect.value;
+
+            elements.expenseSelect.innerHTML = "";
+            candidates.forEach(function (candidate) {
+                const option = document.createElement("option");
+                option.value = String(candidate.id || "");
+                option.textContent = (candidate.date || "") + " • $" + (candidate.amount || "");
+                option.dataset.comparison = candidate.comparison ? JSON.stringify(candidate.comparison) : "";
+                option.dataset.detailUrl = candidate.detail_url || "#";
+                elements.expenseSelect.appendChild(option);
+            });
+
+            if (!candidates.length) {
+                const placeholder = document.createElement("option");
+                placeholder.value = "";
+                placeholder.textContent = "No matching expenses found for this restaurant";
+                elements.expenseSelect.appendChild(placeholder);
+                elements.expenseSelect.value = "";
+            } else if (currentValue && candidates.some(function (candidate) { return String(candidate.id) === currentValue; })) {
+                elements.expenseSelect.value = currentValue;
+            } else {
+                elements.expenseSelect.selectedIndex = 0;
+            }
+
+            if (elements.expenseMatchPanel) {
+                elements.expenseMatchPanel.classList.toggle("is-hidden", !candidates.length);
+            }
+
+            if (elements.openExpenseLink) {
+                const selectedOption = elements.expenseSelect.options[elements.expenseSelect.selectedIndex];
+                elements.openExpenseLink.setAttribute(
+                    "href",
+                    selectedOption && selectedOption.dataset.detailUrl ? selectedOption.dataset.detailUrl : "#"
+                );
+            }
+
+            if (elements.openRestaurantLink) {
+                const selectedRestaurantOption = getSelectedRestaurantOption(elements);
+                elements.openRestaurantLink.setAttribute(
+                    "href",
+                    selectedRestaurantOption && selectedRestaurantOption.dataset.detailUrl
+                        ? selectedRestaurantOption.dataset.detailUrl
+                        : "#"
+                );
+            }
+
+            return candidates;
+        }
+
+        function updateSelectedExpenseComparison(rowNumber) {
+            const elements = getRowElements(rowNumber);
+            if (!(elements.expenseSelect instanceof HTMLSelectElement)) {
+                return null;
+            }
+
+            const option = elements.expenseSelect.options[elements.expenseSelect.selectedIndex];
+            const rawComparison = option ? option.dataset.comparison : "";
+
+            if (!rawComparison) {
+                return null;
+            }
+
+            return JSON.parse(rawComparison);
+        }
+
+        function renderActionState(rowNumber) {
+            const elements = getRowElements(rowNumber);
+            if (
+                !(elements.expenseAction instanceof HTMLSelectElement) ||
+                !(elements.restaurantAction instanceof HTMLSelectElement) ||
+                !elements.actionSummary ||
+                !elements.actionChips ||
+                !elements.statusPanel
+            ) {
+                return;
+            }
+
+            const restaurantAction = elements.restaurantAction.value;
+            const restaurantResolved =
+                restaurantAction === "match" &&
+                elements.restaurantSelect instanceof HTMLSelectElement &&
+                Boolean(elements.restaurantSelect.value);
+            const duplicateCandidates = populateExpenseOptions(rowNumber);
+            renderRestaurantMatch(rowNumber);
+            if (
+                restaurantResolved &&
+                elements.expenseAction.value === "update" &&
+                !(duplicateCandidates && duplicateCandidates.length)
+            ) {
+                elements.expenseAction.value = "create";
+            }
+
+            const expenseAction = elements.expenseAction.value;
+            const comparison = updateSelectedExpenseComparison(rowNumber);
+
+            const skipByDisposition = expenseAction === "skip";
+            const skipRow = skipByDisposition;
+            const expenseBlocked = !restaurantResolved;
+            if (elements.expenseChoiceCard) {
+                elements.expenseChoiceCard.classList.toggle("is-muted", skipRow || expenseBlocked);
+            }
+            if (elements.restaurantChoiceCard) {
+                elements.restaurantChoiceCard.classList.remove("is-muted");
+            }
+
+            if (elements.restaurantMatchPanel) {
+                elements.restaurantMatchPanel.classList.toggle("is-hidden", restaurantAction !== "match");
+            }
+
+            if (elements.restaurantSelect instanceof HTMLSelectElement) {
+                elements.restaurantSelect.disabled = restaurantAction !== "match";
+            }
+            elements.expenseAction.disabled = expenseBlocked;
+            if (elements.expenseSelect instanceof HTMLSelectElement) {
+                elements.expenseSelect.disabled = expenseBlocked || expenseAction !== "update";
+            }
+            elements.restaurantAction.disabled = false;
+
+            const chips = [];
+            let summary = "";
+            let updatePreviewHtml = "";
+
+            elements.statusPanel.classList.remove("skip", "create", "update");
+            if (elements.rowStatus) {
+                elements.rowStatus.classList.remove("ready", "review", "skipped", "blocked");
+            }
+
+            if (expenseBlocked) {
+                chips.push('<span class="import-review-chip blocked"><i class="fas fa-link"></i>Resolve restaurant</span>');
+                summary = "Resolve the restaurant first, then choose whether to create or update an expense.";
+                if (elements.rowStatus) {
+                    elements.rowStatus.classList.add("blocked");
+                    elements.rowStatus.textContent = "Blocked";
+                }
+            } else if (skipRow) {
+                chips.push('<span class="import-review-chip skip"><i class="fas fa-forward"></i>Skip row</span>');
+                summary = "Skip this expense. No expense or restaurant changes will be applied.";
+                elements.statusPanel.classList.add("skip");
+                if (elements.rowStatus) {
+                    elements.rowStatus.classList.add("skipped");
+                    elements.rowStatus.textContent = "Skipped";
+                }
+            } else if (expenseAction === "create") {
+                chips.push(
+                    '<span class="import-review-chip create"><i class="fas fa-receipt"></i>Create expense</span>'
+                );
+                if (restaurantAction === "match") {
+                    chips.push(
+                        '<span class="import-review-chip match"><i class="fas fa-link"></i>Match restaurant</span>'
+                    );
+                    const selectedOption =
+                        elements.restaurantSelect instanceof HTMLSelectElement
+                            ? elements.restaurantSelect.options[elements.restaurantSelect.selectedIndex]
+                            : null;
+                    const selectedText =
+                        selectedOption && selectedOption.value ? selectedOption.text.trim() : "selected restaurant";
+                    summary = "Create a new expense and match it to " + selectedText + ".";
+                }
+                elements.statusPanel.classList.add("create");
+                if (elements.rowStatus) {
+                    elements.rowStatus.classList.add("ready");
+                    elements.rowStatus.textContent = "Create";
+                }
+            } else if (expenseAction === "update") {
+                chips.push('<span class="import-review-chip update"><i class="fas fa-pen"></i>Update expense</span>');
+                if (restaurantAction === "match") {
+                    chips.push(
+                        '<span class="import-review-chip match"><i class="fas fa-link"></i>Match restaurant</span>'
+                    );
+                }
+                summary =
+                    comparison && comparison.summary ? comparison.summary : "Update the selected existing expense.";
+                if (comparison && comparison.changes && comparison.changes.length) {
+                    updatePreviewHtml = comparison.changes
+                        .map(function (change) {
+                            const currentValue =
+                                !change.current || change.current === "Not provided" ? "(None)" : change.current;
+                            const newValue = !change.new || change.new === "Not provided" ? "(None)" : change.new;
+                            return (
+                                '<div class="import-review-update-line import-review-compare-value update">' +
+                                change.field +
+                                ": " +
+                                currentValue +
+                                " -> " +
+                                newValue +
+                                "</div>"
+                            );
+                        })
+                        .join("");
+                }
+                elements.statusPanel.classList.add("update");
+                if (elements.rowStatus) {
+                    elements.rowStatus.classList.add("review");
+                    elements.rowStatus.textContent = "Update";
+                }
+            }
+
+            if (elements.existingFields && comparison) {
+                elements.existingFields.innerHTML = buildComparisonFields(
+                    comparison.fields || [],
+                    "current",
+                    expenseAction
+                );
+            } else if (elements.existingFields) {
+                elements.existingFields.innerHTML = restaurantResolved
+                    ? '<div class="small text-muted">No matching expenses found for this restaurant.</div>'
+                    : '<div class="small text-muted">Choose or confirm the restaurant to identify any matching expenses.</div>';
+            }
+            if (elements.importedFields && comparison) {
+                elements.importedFields.innerHTML = buildComparisonFields(
+                    comparison.fields || [],
+                    "new",
+                    expenseAction
+                );
+            }
+
+            elements.actionChips.innerHTML = chips.join("");
+            elements.actionSummary.textContent = summary;
+            const updatePreview = document.getElementById("update_preview_" + rowNumber);
+            if (updatePreview) {
+                updatePreview.innerHTML = expenseAction === "update" ? updatePreviewHtml : "";
+            }
+            if (elements.tagPreview) {
+                elements.tagPreview.innerHTML = comparison ? buildTagPreview(comparison, expenseAction) : "";
+            }
+        }
+
+        document
+            .querySelectorAll(
+                "select[id^='expense_action_'], select[id^='restaurant_action_'], select[id^='restaurant_id_'], select[id^='update_expense_id_']"
+            )
+            .forEach(function (field) {
+                field.addEventListener(
+                    "change",
+                    function () {
+                        const rowNumber = field.dataset.rowNumber || field.id.replace(/^[a-z_]+/, "").replace(/^_/, "");
+                        renderActionState(rowNumber);
+                    }
+                );
+            });
+
+        const reviewForm = document.querySelector('form[action="{{ url_for("expenses.import_expenses") }}"]');
+        if (reviewForm instanceof HTMLFormElement) {
+            reviewForm.addEventListener("submit", function (event) {
+                const blockedRows = [];
+                document.querySelectorAll("tr[data-row-number]").forEach(function (row) {
+                    const rowNumber = row.dataset.rowNumber || "";
+                    const elements = getRowElements(rowNumber);
+                    if (!(elements.expenseAction instanceof HTMLSelectElement)) {
+                        return;
+                    }
+                    if (elements.expenseAction.value === "skip") {
+                        return;
+                    }
+                    if (!(elements.restaurantSelect instanceof HTMLSelectElement) || !elements.restaurantSelect.value) {
+                        blockedRows.push("#" + rowNumber);
+                    }
+                });
+                if (blockedRows.length) {
+                    event.preventDefault();
+                    window.alert(
+                        "Match a restaurant before applying import changes for rows: " + blockedRows.join(", ")
+                    );
+                }
+            });
+        }
+
+        document.querySelectorAll("tr[data-row-number]").forEach(function (row) {
+            renderActionState(row.dataset.rowNumber);
+        });
+    });
+</script>
+{% endblock extra_js %}

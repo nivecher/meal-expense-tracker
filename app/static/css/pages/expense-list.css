@@ -915,3 +915,24 @@
   margin: 0 auto;
   box-shadow: none;
 }
+
+.receipt-reconciliation-cell {
+  min-width: 14rem;
+}
+
+.receipt-reconciliation-pill {
+  border: 1px solid var(--gray-200, #e5e7eb);
+  border-radius: 0.75rem;
+  padding: 0.625rem 0.75rem;
+  background: var(--gray-50, #f9fafb);
+}
+
+.receipt-reconciliation-issues {
+  padding-left: 1rem;
+  margin: 0;
+  font-size: 0.875rem;
+}
+
+.receipt-reconciliation-issues li + li {
+  margin-top: 0.25rem;
+}

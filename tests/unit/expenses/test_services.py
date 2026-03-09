@@ -4,7 +4,7 @@ These tests focus on the business logic in app/expenses/services.py
 without Flask context complexity, providing maximum coverage impact.
 """
 
-from datetime import date
+from datetime import date, datetime
 from decimal import Decimal
 from unittest.mock import Mock
 
@@ -12,8 +12,10 @@ import pytest
 
 from app import create_app
 from app.auth.models import User
-from app.expenses.models import Category, Expense
+from app.expenses.models import Category, Expense, ExpenseTag, Tag
 from app.expenses.services import (
+    apply_expense_import_review,
+    build_expense_import_review,
     create_expense_for_user,
     delete_expense_for_user,
     export_expenses_for_user,
@@ -237,6 +239,13 @@ class TestExpenseServices:
         user_obj, user_id = user  # Unpack user and user_id
         expense_obj, expense_id = expense  # Unpack expense and expense_id
         with app.app_context():
+            stored_expense = db.session.get(Expense, expense_id)
+            assert stored_expense is not None
+            assert stored_expense.restaurant is not None
+            stored_expense.restaurant.location_name = "Wylie"
+            db.session.add(stored_expense.restaurant)
+            db.session.commit()
+
             expenses_data = export_expenses_for_user(user_id)
 
             # Check that we get a list of dictionaries
@@ -246,6 +255,28 @@ class TestExpenseServices:
             expense_data = expenses_data[0]
             assert expense_data["amount"] == 25.50
             assert expense_data["notes"] == "Test expense"
+            assert expense_data["restaurant_name"] == "Test Restaurant - Wylie"
+
+    def test_export_expenses_preserves_tag_order(self, app, user, expense) -> None:
+        """Export should preserve the order tags were added to the expense."""
+        user_obj, user_id = user
+        expense_obj, expense_id = expense
+
+        with app.app_context():
+            first_tag = Tag(name="Zeta", user_id=user_id)
+            second_tag = Tag(name="Alpha", user_id=user_id)
+            db.session.add_all([first_tag, second_tag])
+            db.session.commit()
+
+            db.session.add(ExpenseTag(expense_id=expense_id, tag_id=first_tag.id, added_by=user_id))
+            db.session.commit()
+            db.session.add(ExpenseTag(expense_id=expense_id, tag_id=second_tag.id, added_by=user_id))
+            db.session.commit()
+
+            expenses_data = export_expenses_for_user(user_id, [expense_id])
+
+            assert len(expenses_data) == 1
+            assert expenses_data[0]["tags"] == "Zeta, Alpha"
 
     def test_import_expenses_from_csv(self, app, user, restaurant, category) -> None:
         """Test importing expenses from CSV."""
@@ -296,6 +327,444 @@ class TestExpenseServices:
             assert result["success_count"] == 0
             assert result["error_count"] == 1
             assert len(result["errors"]) > 0
+
+    def test_build_expense_import_review_for_simplifi(self, app, user, restaurant) -> None:
+        """Test building review rows for a Simplifi-style import file."""
+        user_obj, user_id = user
+        restaurant_obj, restaurant_id = restaurant
+
+        with app.app_context():
+            stored_restaurant = db.session.get(Restaurant, restaurant_id)
+            assert stored_restaurant is not None
+            stored_restaurant.name = "Chick-fil-A"
+            stored_restaurant.location_name = "Wylie"
+            db.session.add(
+                Expense(
+                    amount=Decimal("25.00"),
+                    notes="Existing duplicate candidate",
+                    date=datetime.strptime("2026-03-03", "%Y-%m-%d"),
+                    restaurant_id=restaurant_id,
+                    user_id=user_id,
+                )
+            )
+            db.session.commit()
+
+            csv_data = "Date,Payee,Category,Amount,Tags,Notes,Exclusion\n"
+            csv_data += "6-Mar-26,Chick-fil-A - Wylie,Dining & Drinks:Fast Food,-25.00,Pam; Morgan,Test note,yes\n"
+
+            csv_file = Mock()
+            csv_file.read.return_value = csv_data.encode("utf-8")
+            csv_file.seek.return_value = None
+            csv_file.filename = "simplifi.csv"
+
+            success, result = build_expense_import_review(csv_file, user_id)
+
+            assert success is True
+            assert result["total_rows"] == 1
+            row = result["review_rows"][0]
+            assert row["import_source_type"] == "simplifi"
+            assert row["parsed_visit_date"] == ""
+            assert row["parsed_cleared_date"] == "2026-03-06"
+            assert row["parsed_date"] == "2026-03-06"
+            assert row["parsed_time_display"] == ""
+            assert row["amount"] == "25.00"
+            assert row["category_name"] == "Fast Food"
+            assert row["tags"] == "Pam, Morgan"
+            assert row["default_decision"] == "skip"
+            assert len(row["duplicate_candidates"]) == 1
+            assert row["duplicate_candidates"][0]["time_display"] == "00:00 UTC"
+            comparison = row["duplicate_candidates"][0]["comparison"]
+            assert comparison["change_count"] == 4
+            assert {change["field"] for change in comparison["changes"]} == {
+                "Cleared Date",
+                "Expense category",
+                "Notes",
+                "Tags",
+            }
+            assert row["restaurant_candidates"][0]["display_name"] == "Chick-fil-A - Wylie"
+            assert row["tag_count"] == 2
+            assert row["tag_new_count"] == 2
+
+    def test_build_expense_import_review_accepts_simplifi_default_date_format(self, app, user) -> None:
+        """Test Simplifi import review supports month-name dates like 'Jan 1, 2025'."""
+        user_obj, user_id = user
+
+        with app.app_context():
+            csv_data = "Date,Payee,Category,Amount,Tags,Notes,Exclusion\n"
+            csv_data += '"Jan 1, 2025",Coffee Shop,Dining & Drinks:Coffee,-5.75,,,no\n'
+
+            csv_file = Mock()
+            csv_file.read.return_value = csv_data.encode("utf-8")
+            csv_file.seek.return_value = None
+            csv_file.filename = "simplifi-default-date.csv"
+
+            success, result = build_expense_import_review(csv_file, user_id)
+
+            assert success is True
+            assert result["total_rows"] == 1
+            row = result["review_rows"][0]
+            assert row["import_source_type"] == "simplifi"
+            assert row["parsed_date"] == "2025-01-01"
+            assert row["parsed_cleared_date"] == "2025-01-01"
+            assert row["amount"] == "5.75"
+            assert row["default_decision"] == "skip"
+            assert row["error_messages"] == []
+
+    def test_build_expense_import_review_warns_when_cleared_date_is_far_after_visit_date(
+        self, app, user, restaurant
+    ) -> None:
+        """Test Simplifi review warns when cleared date is more than three days after visit date."""
+        user_obj, user_id = user
+        restaurant_obj, restaurant_id = restaurant
+
+        with app.app_context():
+            existing_expense = Expense(
+                amount=Decimal("25.00"),
+                notes="Existing duplicate candidate",
+                date=datetime.strptime("2026-03-01", "%Y-%m-%d"),
+                restaurant_id=restaurant_id,
+                user_id=user_id,
+            )
+            db.session.add(existing_expense)
+            db.session.commit()
+
+            csv_data = "Date,Payee,Category,Amount,Exclusion\n"
+            csv_data += "6-Mar-26,Test Restaurant,Dining & Drinks:Fast Food,-25.00,no\n"
+
+            csv_file = Mock()
+            csv_file.read.return_value = csv_data.encode("utf-8")
+            csv_file.seek.return_value = None
+            csv_file.filename = "simplifi-warning.csv"
+
+            success, result = build_expense_import_review(csv_file, user_id)
+
+            assert success is True
+            row = result["review_rows"][0]
+            assert row["warning_messages"] == [
+                f"Expense #{existing_expense.id}: Cleared date 2026-03-06 is 5 days after visit date 2026-03-01."
+            ]
+
+    def test_build_expense_import_review_ignores_blank_rows_and_matches_by_address(self, app, user) -> None:
+        """Test that blank rows are ignored and restaurant suggestions can match by address."""
+        user_obj, user_id = user
+
+        with app.app_context():
+            restaurant = Restaurant(
+                name="The Atrium Cafe",
+                address_line_1="123 Main St Wylie TX",
+                user_id=user_id,
+            )
+            db.session.add(restaurant)
+            db.session.commit()
+
+            csv_data = "Date,Payee,Address,Category,Amount,Tags,Notes\n"
+            csv_data += ",,,,,,\n"
+            csv_data += (
+                "5-Mar-26,Unknown Payee,123 Main St Wylie TX,Dining & Drinks:Restaurants,-17.59,Morgan,Address match\n"
+            )
+
+            csv_file = Mock()
+            csv_file.read.return_value = csv_data.encode("utf-8")
+            csv_file.seek.return_value = None
+            csv_file.filename = "simplifi-address.csv"
+
+            success, result = build_expense_import_review(csv_file, user_id)
+
+            assert success is True
+            assert result["total_rows"] == 1
+            row = result["review_rows"][0]
+            assert row["restaurant_candidates"][0]["display_name"] == "The Atrium Cafe"
+            assert row["restaurant_candidates"][0]["match_basis"] == "address"
+            assert row["default_decision"] == "match"
+
+    def test_build_expense_import_review_prefers_exact_display_name_without_address(self, app, user) -> None:
+        """Test that no-address matching still prefers an exact display name match."""
+        user_obj, user_id = user
+
+        with app.app_context():
+            broad_restaurant = Restaurant(name="Wingstop", user_id=user_id)
+            exact_restaurant = Restaurant(name="Wingstop", location_name="Wylie", user_id=user_id)
+            db.session.add(broad_restaurant)
+            db.session.add(exact_restaurant)
+            db.session.commit()
+
+            csv_data = "Date,Payee,Category,Amount\n"
+            csv_data += "7-Mar-26,Wingstop - Wylie,Dining & Drinks:Fast Food,-37.75\n"
+
+            csv_file = Mock()
+            csv_file.read.return_value = csv_data.encode("utf-8")
+            csv_file.seek.return_value = None
+            csv_file.filename = "simplifi-full-payee.csv"
+
+            success, result = build_expense_import_review(csv_file, user_id)
+
+            assert success is True
+            row = result["review_rows"][0]
+            assert row["restaurant_candidates"][0]["display_name"] == "Wingstop - Wylie"
+            assert row["restaurant_candidates"][0]["match_basis"] == "exact display name"
+
+    def test_build_expense_import_review_allows_partial_name_match_without_address(self, app, user) -> None:
+        """Test that no-address rows can suggest partial restaurant name matches."""
+        user_obj, user_id = user
+
+        with app.app_context():
+            restaurant = Restaurant(name="Woodbridge Golf Club", user_id=user_id)
+            db.session.add(restaurant)
+            db.session.commit()
+
+            csv_data = "Date,Payee,Category,Amount\n"
+            csv_data += "6-Mar-26,Woodbridge Golf Course,Dining & Drinks:Restaurants,-104.33\n"
+
+            csv_file = Mock()
+            csv_file.read.return_value = csv_data.encode("utf-8")
+            csv_file.seek.return_value = None
+            csv_file.filename = "woodbridge.csv"
+
+            success, result = build_expense_import_review(csv_file, user_id)
+
+            assert success is True
+            row = result["review_rows"][0]
+            assert row["restaurant_candidates"][0]["display_name"] == "Woodbridge Golf Club"
+            assert row["restaurant_candidates"][0]["match_basis"] in {"partial name", "shared prefix"}
+            assert row["suggested_restaurant_id"] == restaurant.id
+            assert row["expense_default_action"] == "create"
+
+    def test_build_expense_import_review_requires_confirmation_for_multiple_restaurant_matches(self, app, user) -> None:
+        """Test that multiple exact display-name matches require explicit confirmation."""
+        user_obj, user_id = user
+
+        with app.app_context():
+            db.session.add(Restaurant(name="Wingstop", location_name="Wylie", user_id=user_id))
+            db.session.add(Restaurant(name="Wingstop", location_name="Wylie", user_id=user_id))
+            db.session.commit()
+
+            csv_data = "Date,Payee,Category,Amount\n"
+            csv_data += "7-Mar-26,Wingstop - Wylie,Dining & Drinks:Fast Food,-37.75\n"
+
+            csv_file = Mock()
+            csv_file.read.return_value = csv_data.encode("utf-8")
+            csv_file.seek.return_value = None
+            csv_file.filename = "simplifi-multiple-exact.csv"
+
+            success, result = build_expense_import_review(csv_file, user_id)
+
+            assert success is True
+            row = result["review_rows"][0]
+            assert len(row["restaurant_candidates"]) == 2
+            assert row["restaurant_requires_confirmation"] is True
+            assert row["suggested_restaurant_id"] is None
+            assert row["expense_default_action"] == "skip"
+
+    def test_apply_expense_import_review_requires_matched_restaurant(self, app, user, restaurant, category) -> None:
+        """Test applying reviewed import decisions with matched restaurants."""
+        user_obj, user_id = user
+        restaurant_obj, restaurant_id = restaurant
+        category_obj, category_id = category
+
+        with app.app_context():
+            review_rows = [
+                {
+                    "row_number": 1,
+                    "import_source_type": "standard",
+                    "parsed_visit_date": "2026-03-06",
+                    "amount": "31.05",
+                    "category_name": "Test Category",
+                    "notes": "Reviewed row",
+                    "tags": "Morgan, Pam",
+                    "restaurant_name": "Test Restaurant",
+                    "error_messages": [],
+                    "default_decision": "match",
+                },
+                {
+                    "row_number": 2,
+                    "import_source_type": "standard",
+                    "parsed_visit_date": "2026-03-07",
+                    "amount": "18.15",
+                    "category_name": "Test Category",
+                    "notes": "Matched row",
+                    "tags": "",
+                    "restaurant_name": "Test Restaurant",
+                    "error_messages": [],
+                    "default_decision": "match",
+                },
+            ]
+
+            result = apply_expense_import_review(
+                review_rows,
+                {
+                    "decision_1": "match",
+                    "restaurant_id_1": str(restaurant_id),
+                    "decision_2": "match",
+                    "restaurant_id_2": str(restaurant_id),
+                },
+                user_id,
+            )
+
+            assert result["success"] is True
+            assert result["imported_count"] == 2
+            expenses = get_expenses_for_user(user_id)
+            assert len(expenses) == 2
+            assert all(expense.restaurant_id == restaurant_id for expense in expenses)
+
+    def test_apply_expense_import_review_rejects_unmatched_restaurant(self, app, user) -> None:
+        """Test import review cannot apply changes when restaurant is unresolved."""
+        user_obj, user_id = user
+
+        with app.app_context():
+            review_rows = [
+                {
+                    "row_number": 1,
+                    "import_source_type": "standard",
+                    "parsed_visit_date": "2026-03-06",
+                    "amount": "31.05",
+                    "category_name": "Test Category",
+                    "notes": "Reviewed row",
+                    "tags": "",
+                    "restaurant_name": "Unknown Place",
+                    "error_messages": [],
+                    "default_decision": "skip",
+                }
+            ]
+
+            result = apply_expense_import_review(
+                review_rows,
+                {
+                    "decision_1": "match",
+                    "expense_action_1": "create",
+                    "restaurant_action_1": "match",
+                    "restaurant_id_1": "",
+                },
+                user_id,
+            )
+
+            assert result["success"] is False
+            assert result["errors"] == ["Row 1: Select a restaurant match before applying expense changes."]
+
+    def test_apply_expense_import_review_updates_existing_expense(self, app, user, restaurant) -> None:
+        """Test updating an existing expense from an import review row."""
+        user_obj, user_id = user
+        restaurant_obj, restaurant_id = restaurant
+
+        with app.app_context():
+            old_category = Category(name="Old Category", user_id=user_id)
+            new_category = Category(name="Fast Food", user_id=user_id)
+            db.session.add_all([old_category, new_category])
+            db.session.commit()
+
+            existing_expense = Expense(
+                amount=Decimal("25.00"),
+                notes="Old note",
+                date=datetime.fromisoformat("2026-03-03T16:30:00+00:00"),
+                restaurant_id=restaurant_id,
+                category_id=old_category.id,
+                meal_type="dinner",
+                order_type="dine-in",
+                party_size=4,
+                user_id=user_id,
+            )
+            db.session.add(existing_expense)
+            db.session.commit()
+
+            old_tag = Tag(name="OldTag", user_id=user_id)
+            db.session.add(old_tag)
+            db.session.commit()
+            db.session.add(ExpenseTag(expense_id=existing_expense.id, tag_id=old_tag.id, added_by=user_id))
+            db.session.commit()
+
+            review_rows = [
+                {
+                    "row_number": 1,
+                    "import_source_type": "standard",
+                    "parsed_visit_date": "2026-03-06",
+                    "parsed_visit_datetime_utc": "2026-03-06T00:00:00+00:00",
+                    "has_explicit_time": False,
+                    "amount": "25.00",
+                    "category_name": "Fast Food",
+                    "notes": "Updated from import",
+                    "tags": "Pam, Morgan",
+                    "meal_type": "lunch",
+                    "order_type": "takeout",
+                    "party_size": "2",
+                    "restaurant_name": "Test Restaurant",
+                    "duplicate_candidates": [{"id": existing_expense.id}],
+                    "duplicate_candidates_by_restaurant": {str(restaurant_id): [{"id": existing_expense.id}]},
+                    "error_messages": [],
+                    "default_decision": "skip",
+                }
+            ]
+
+            result = apply_expense_import_review(
+                review_rows,
+                {
+                    "decision_1": "update",
+                    "restaurant_id_1": str(restaurant_id),
+                    "update_expense_id_1": str(existing_expense.id),
+                },
+                user_id,
+            )
+
+            assert result["success"] is True
+            assert result["imported_count"] == 0
+            assert result["updated_count"] == 1
+
+            db.session.refresh(existing_expense)
+            assert existing_expense.date.isoformat() == "2026-03-06T16:30:00"
+            assert existing_expense.amount == Decimal("25.00")
+            assert existing_expense.category_id == new_category.id
+            assert existing_expense.notes == "Updated from import"
+            assert existing_expense.meal_type == "lunch"
+            assert existing_expense.order_type == "takeout"
+            assert existing_expense.party_size == 2
+            assert [tag.name for tag in existing_expense.tags] == ["Pam", "Morgan"]
+
+    def test_apply_expense_import_review_updates_existing_expense_cleared_date_for_simplifi(
+        self, app, user, restaurant
+    ) -> None:
+        """Test Simplifi review updates cleared date without overwriting visit date."""
+        user_obj, user_id = user
+        restaurant_obj, restaurant_id = restaurant
+
+        with app.app_context():
+            existing_expense = Expense(
+                amount=Decimal("25.00"),
+                notes="Old note",
+                date=datetime.fromisoformat("2026-03-03T16:30:00+00:00"),
+                restaurant_id=restaurant_id,
+                user_id=user_id,
+            )
+            db.session.add(existing_expense)
+            db.session.commit()
+
+            review_rows = [
+                {
+                    "row_number": 1,
+                    "import_source_type": "simplifi",
+                    "parsed_cleared_date": "2026-03-06",
+                    "amount": "25.00",
+                    "notes": "Updated from import",
+                    "tags": "",
+                    "restaurant_name": "Test Restaurant",
+                    "duplicate_candidates": [{"id": existing_expense.id}],
+                    "duplicate_candidates_by_restaurant": {str(restaurant_id): [{"id": existing_expense.id}]},
+                    "error_messages": [],
+                    "default_decision": "skip",
+                }
+            ]
+
+            result = apply_expense_import_review(
+                review_rows,
+                {
+                    "decision_1": "update",
+                    "restaurant_id_1": str(restaurant_id),
+                    "update_expense_id_1": str(existing_expense.id),
+                },
+                user_id,
+            )
+
+            assert result["success"] is True
+            db.session.refresh(existing_expense)
+            assert existing_expense.date.isoformat() == "2026-03-03T16:30:00"
+            assert existing_expense.cleared_date.isoformat() == "2026-03-06"
 
     def test_expense_services_error_handling(self, app, user) -> None:
         """Test error handling in expense services."""

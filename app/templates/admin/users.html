@@ -1,6 +1,10 @@
 {% extends "admin/base.html" %} {% from 'macros/avatar_helpers.html' import user_avatar_simple %} {% block page_actions
 %}
 <div class="btn-group" role="group">
+    <a href="{{ url_for('admin.import_user_route') }}" class="btn btn-primary">
+        <i class="fas fa-file-import me-1"></i>
+        Import Backup
+    </a>
     <a href="{{ url_for('admin.create_user') }}" class="btn btn-success">
         <i class="fas fa-user-plus me-1"></i>
         Create User
@@ -35,10 +39,10 @@
                     <div class="col-md-2">
                         <label for="per_page" class="form-label">Per Page</label>
                         <select class="form-select" id="per_page" name="per_page">
-                            <option value="10" {% if users.per_page="" ="10" %}selected{% endif %}>10</option>
-                            <option value="20" {% if users.per_page="" ="20" %}selected{% endif %}>20</option>
-                            <option value="50" {% if users.per_page="" ="50" %}selected{% endif %}>50</option>
-                            <option value="100" {% if users.per_page="" ="100" %}selected{% endif %}>100</option>
+                            <option value="10" {% if users.per_page == 10 %}selected{% endif %}>10</option>
+                            <option value="20" {% if users.per_page == 20 %}selected{% endif %}>20</option>
+                            <option value="50" {% if users.per_page == 50 %}selected{% endif %}>50</option>
+                            <option value="100" {% if users.per_page == 100 %}selected{% endif %}>100</option>
                         </select>
                     </div>
                     <div class="col-md-2">
@@ -177,6 +181,12 @@
                                         class="btn btn-sm btn-outline-primary"
                                         title="View Details">
                                         <i class="fas fa-eye"></i>
+                                    </a>
+                                    <a
+                                        href="{{ url_for('admin.export_user', user_id=user.id) }}"
+                                        class="btn btn-sm btn-outline-info"
+                                        title="Export User Backup">
+                                        <i class="fas fa-file-export"></i>
                                     </a>
                                     {% if user.id != current_user.id %}
                                     <form

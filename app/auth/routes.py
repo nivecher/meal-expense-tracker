@@ -20,6 +20,7 @@ from flask_login import current_user, login_required, login_user, logout_user
 from app.auth import bp, services
 from app.auth.models import User
 from app.extensions import db, limiter
+from app.utils.phone_utils import normalize_phone_for_storage
 
 from .forms import ChangePasswordForm, LoginForm, RegistrationForm
 
@@ -255,7 +256,7 @@ def _handle_regular_profile_update() -> Response:
     current_user.last_name = request.form.get("last_name", "").strip() or None
     current_user.display_name = request.form.get("display_name", "").strip() or None
     current_user.bio = request.form.get("bio", "").strip() or None
-    current_user.phone = request.form.get("phone", "").strip() or None
+    current_user.phone = normalize_phone_for_storage(request.form.get("phone"))
     current_user.timezone = request.form.get("timezone", "UTC").strip()
     current_user.avatar_url = request.form.get("avatar_url", "").strip() or None
 

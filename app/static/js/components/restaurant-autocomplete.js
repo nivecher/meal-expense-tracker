@@ -19,6 +19,7 @@ class RestaurantAutocomplete {
     this.suggestions = [];
     this.userLocation = null;
     this.locationError = null;
+    this.nearbyToggle = document.getElementById('restaurant-search-include-nearby');
     this.init();
   }
 
@@ -31,7 +32,9 @@ class RestaurantAutocomplete {
     console.log('RestaurantAutocomplete init() called');
     this.createSuggestionsContainer();
     this.setupEventListeners();
-    this.getUserLocation();
+    if (this.shouldIncludeNearbyResults()) {
+      this.getUserLocation();
+    }
     console.log('RestaurantAutocomplete initialization complete');
   }
 
@@ -111,6 +114,23 @@ class RestaurantAutocomplete {
         this.selectCurrentSuggestion();
       }
     });
+
+    if (this.nearbyToggle) {
+      this.nearbyToggle.addEventListener('change', () => {
+        if (this.nearbyToggle.checked && !this.userLocation && !this.locationError) {
+          this.getUserLocation();
+        }
+
+        const query = this.input.value.trim();
+        if (query.length >= 3) {
+          this.handleInput(query);
+        }
+      });
+    }
+  }
+
+  shouldIncludeNearbyResults() {
+    return !this.nearbyToggle || this.nearbyToggle.checked;
   }
 
   async handleInput(query) {
@@ -127,7 +147,7 @@ class RestaurantAutocomplete {
       this.showLoading(query);
 
       // If we don't have location yet, try to get it
-      if (!this.userLocation && !this.locationError) {
+      if (this.shouldIncludeNearbyResults() && !this.userLocation && !this.locationError) {
         console.log('Attempting to get location for better search results...');
         await this.getUserLocation();
       }
@@ -208,7 +228,7 @@ class RestaurantAutocomplete {
       });
 
       // Add location parameters if we have user location
-      if (this.userLocation) {
+      if (this.shouldIncludeNearbyResults() && this.userLocation) {
         params.append('lat', this.userLocation.lat);
         params.append('lng', this.userLocation.lng);
 
@@ -219,7 +239,7 @@ class RestaurantAutocomplete {
           `Searching with location: ${this.userLocation.lat}, ${this.userLocation.lng}, radius: ${radius} miles`,
         );
       } else {
-        console.log('Searching without location (fallback to text-only search)');
+        console.log('Searching without location (general text search only)');
       }
 
       const url = `/restaurants/api/places/search?${params.toString()}`;

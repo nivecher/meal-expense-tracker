@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 from flask import current_app
@@ -33,7 +34,6 @@ class Restaurant(BaseModel):
         website: Restaurant website URL
         email: Contact email
         cuisine: Type of cuisine
-        is_chain: Whether it's a chain restaurant
         rating: User's personal rating (1.0-5.0)
         notes: Additional notes
     """
@@ -94,12 +94,6 @@ class Restaurant(BaseModel):
         index=True,
         comment="Service level (fine_dining, casual_dining, fast_casual, quick_service)",
     )
-    is_chain: Mapped[bool] = mapped_column(
-        db.Boolean,
-        default=False,
-        nullable=False,
-        comment="Whether it's a chain restaurant",
-    )
     rating: Mapped[float | None] = mapped_column(db.Float, comment="User's personal rating (1.0-5.0)")
     price_level: Mapped[int | None] = mapped_column(
         db.Integer,
@@ -148,13 +142,72 @@ class Restaurant(BaseModel):
 
     @property
     def display_name(self) -> str:
-        """Return display-friendly name with merchant short name when available."""
+        """Return display-friendly name.
+
+        Format:
+        - With merchant + location: "{merchant short_name or name} - {location_name}"
+        - With merchant only: "{merchant short_name or name}"
+        - Without merchant + location: "{restaurant name} - {location_name}"
+        - Without merchant only: "{restaurant name}"
+        """
+
+        def clean_display_text(value: str | None) -> str | None:
+            if value is None:
+                return None
+            text = str(value).strip()
+            if not text:
+                return None
+            if text.lower() in {"none", "null", "n/a", "na"}:
+                return None
+            return text
+
+        def normalize_for_compare(value: str) -> str:
+            normalized = re.sub(r"[^a-z0-9]+", " ", value.lower()).strip()
+            return re.sub(r"\s+", " ", normalized)
+
         merchant = self.merchant
-        short_name = merchant.short_name if merchant else None
-        base_name = (self.location_name or "").strip() or self.name
-        if short_name and short_name.strip():
-            return f"{short_name.strip()} {base_name}".strip()
-        return base_name
+        merchant_short_name = clean_display_text(merchant.short_name if merchant else None)
+        merchant_name = clean_display_text(merchant.name if merchant else None)
+        merchant_display_name = merchant_short_name or merchant_name
+
+        location_name = clean_display_text(self.location_name)
+        if not location_name and merchant_display_name:
+            # Backward-compatible fallback for existing records that stored "Brand - Location"
+            # in name before merchant/location split was used consistently.
+            restaurant_name = clean_display_text(self.name)
+            if restaurant_name and " - " in restaurant_name:
+                prefix, suffix = restaurant_name.split(" - ", 1)
+                if clean_display_text(suffix):
+                    if normalize_for_compare(prefix) == normalize_for_compare(merchant_display_name):
+                        location_name = clean_display_text(suffix)
+
+        if merchant_display_name and location_name:
+            return f"{merchant_display_name} - {location_name}"
+        if merchant_display_name:
+            return merchant_display_name
+
+        restaurant_name = clean_display_text(self.name)
+        if restaurant_name and location_name:
+            return f"{restaurant_name} - {location_name}"
+        return restaurant_name or self.name
+
+    @property
+    def normalized_location_name(self) -> str | None:
+        """Return a cleaned location name value suitable for presence checks."""
+        if self.location_name is None:
+            return None
+
+        location_name = str(self.location_name).strip()
+        if not location_name:
+            return None
+        if location_name.lower() in {"none", "null", "n/a", "na"}:
+            return None
+        return location_name
+
+    @property
+    def needs_location_name_cta(self) -> bool:
+        """Whether the UI should prompt for a missing location name."""
+        return bool(self.merchant and self.merchant.is_chain and not self.normalized_location_name)
 
     @property
     def full_name(self) -> str:
@@ -328,11 +381,11 @@ class Restaurant(BaseModel):
         Args:
             place_data: Raw Google Places API response data
         """
-        from app.utils.url_utils import strip_url_query_params
+        from app.utils.url_utils import canonicalize_website_for_storage
 
         self.phone = place_data.get("nationalPhoneNumber", self.phone) or place_data.get("phone", self.phone)
         website_uri = place_data.get("websiteUri") or place_data.get("website")
-        self.website = strip_url_query_params(website_uri) or self.website
+        self.website = canonicalize_website_for_storage(website_uri) or self.website
 
     def _update_location_data(self, place_data: dict) -> None:
         """Update geographic location data.
@@ -406,12 +459,24 @@ class Restaurant(BaseModel):
         # Note: business_status is time-sensitive and not stored permanently
         # Note: rating is now user's personal rating, not from Google Places
 
+        self._update_description_fallback(place_data)
         self._update_price_level(place_data)
         self._update_primary_type(place_data)
         self._update_coordinates(place_data)
         self._update_website_fallback(place_data)
         self._update_service_level_and_cuisine(place_data)
         self._store_raw_place_data(place_data)
+
+    def _update_description_fallback(self, place_data: dict) -> None:
+        """Set description from Google-mapped data only when current description is empty.
+
+        Preserves manual edits by never overwriting a non-empty user description.
+        """
+        incoming = place_data.get("description")
+        if incoming is None or (isinstance(incoming, str) and not incoming.strip()):
+            return
+        if not (self.description and self.description.strip()):
+            self.description = (incoming.strip())[:500]
 
     def _update_price_level(self, place_data: dict) -> None:
         """Update price level from Google Places data.
@@ -485,10 +550,10 @@ class Restaurant(BaseModel):
             place_data: Raw Google Places API response data
         """
         if not self.website:
-            from app.utils.url_utils import strip_url_query_params
+            from app.utils.url_utils import canonicalize_website_for_storage
 
             website_uri = place_data.get("websiteUri") or place_data.get("website")
-            self.website = strip_url_query_params(website_uri) or self.website
+            self.website = canonicalize_website_for_storage(website_uri) or self.website
 
     def _store_raw_place_data(self, place_data: dict) -> None:
         """Store raw place data for reference.
@@ -560,7 +625,6 @@ class Restaurant(BaseModel):
             "email": self.email,
             "cuisine": self.cuisine,
             "service_level": self.service_level,
-            "is_chain": self.is_chain,
             "rating": self.rating,
             "price_level": self.price_level,
             "merchant_id": self.merchant_id,

@@ -1,3 +1,10 @@
+{% macro expense_field_label(field, extra_classes='') -%}
+    <label for="{{ field.id }}" class="form-label{{ ' ' + extra_classes if extra_classes else '' }}">
+        {{ field.label.text }}
+        {% if field.flags.required %}<span class="text-danger">*</span>{% endif %}
+    </label>
+{%- endmacro %}
+
 {% macro expense_form(form, expense=None, is_edit=false, timezone_display=None) %}
     <form id="expenseForm"
           method="post"
@@ -20,7 +27,7 @@
         <div id="formErrors" class="alert alert-danger d-none"></div>
         <div class="row mb-3">
             <div class="col-md-6">
-                {{ form.restaurant_id.label(class="form-label") }}
+                {{ expense_field_label(form.restaurant_id) }}
                 {{ form.restaurant_id(class_="form-select" + (' is-invalid' if form.restaurant_id.errors else '') ,
                 **({'data-restaurant-id': expense.restaurant_id} if expense and expense.restaurant_id else {})
                 ) }}
@@ -31,7 +38,7 @@
                 </div>
             </div>
             <div class="col-md-6">
-                {{ form.category_id.label(class="form-label") }}
+                {{ expense_field_label(form.category_id) }}
                 <select name="{{ form.category_id.name }}"
                         id="{{ form.category_id.id }}"
                         class="form-select{{ ' is-invalid' if form.category_id.errors else '' }}"
@@ -50,7 +57,7 @@
         </div>
         <div class="row mb-3">
             <div class="col-md-6">
-                {{ form.date.label(class="form-label") }}
+                {{ expense_field_label(form.date) }}
                 {% set default_date = form.date.data.strftime('%Y-%m-%d') if form.date.data else '' %}
                 <input type="date"
                        id="{{ form.date.id }}"
@@ -61,8 +68,26 @@
                 {% if form.date.errors %}<div class="invalid-feedback">{{ form.date.errors[0] }}</div>{% endif %}
             </div>
             <div class="col-md-6">
+                {{ expense_field_label(form.cleared_date) }}
+                {% set default_cleared_date = form.cleared_date.data.strftime('%Y-%m-%d') if form.cleared_date.data else '' %}
+                <input type="date"
+                       id="{{ form.cleared_date.id }}"
+                       name="{{ form.cleared_date.name }}"
+                       class="form-control{{ ' is-invalid' if form.cleared_date.errors else '' }}"
+                       value="{{ default_cleared_date }}">
+                {% if form.cleared_date.errors %}<div class="invalid-feedback">{{ form.cleared_date.errors[0] }}</div>{% endif %}
+                <div class="form-text">
+                    <small class="text-muted">
+                        <i class="fas fa-info-circle me-1"></i>
+                        Optional cleared date for reconciling bank or Simplifi imports.
+                    </small>
+                </div>
+            </div>
+        </div>
+        <div class="row mb-3">
+            <div class="col-md-6">
                 <div class="d-flex justify-content-between align-items-center mb-1">
-                    {{ form.time.label(class="form-label mb-0") }}
+                    {{ expense_field_label(form.time, 'mb-0') }}
                     {% if timezone_display %}
                     <small class="text-muted">
                         <i class="fas fa-clock me-1"></i>
@@ -88,7 +113,7 @@
         </div>
         <div class="row mb-3">
             <div class="col-md-6">
-                {{ form.amount.label(class="form-label") }}
+                {{ expense_field_label(form.amount) }}
                 <div class="input-group">
                     <span class="input-group-text">$</span>
                     {{ form.amount(class_="form-control" + (' is-invalid' if form.amount.errors else '') ,
@@ -108,19 +133,19 @@
                 {% if form.amount.errors %}<div class="invalid-feedback d-block">{{ form.amount.errors[0] }}</div>{% endif %}
             </div>
             <div class="col-md-6">
-                {{ form.meal_type.label(class="form-label") }}
+                {{ expense_field_label(form.meal_type) }}
                 {{ form.meal_type(class="form-select" + (' is-invalid' if form.meal_type.errors else '') ) }}
                 {% if form.meal_type.errors %}<div class="invalid-feedback">{{ form.meal_type.errors[0] }}</div>{% endif %}
             </div>
         </div>
         <div class="row mb-3">
             <div class="col-md-6">
-                {{ form.order_type.label(class="form-label") }}
+                {{ expense_field_label(form.order_type) }}
                 {{ form.order_type(class="form-select" + (' is-invalid' if form.order_type.errors else '') ) }}
                 {% if form.order_type.errors %}<div class="invalid-feedback">{{ form.order_type.errors[0] }}</div>{% endif %}
             </div>
             <div class="col-md-6">
-                {{ form.party_size.label(class="form-label") }}
+                {{ expense_field_label(form.party_size) }}
                 {{ form.party_size(class="form-control" + (' is-invalid' if form.party_size.errors else ''),
                 **{'x-model': 'partySize'}
                 ) }}
@@ -143,7 +168,7 @@
         </div>
         <div class="row mb-3">
             <div class="col-md-6">
-                {{ form.notes.label(class="form-label") }}
+                {{ expense_field_label(form.notes) }}
                 {{ form.notes(class="form-control" + (' is-invalid' if form.notes.errors else '') ,
                 placeholder="Brief description of the expense") }}
                 {% if form.notes.errors %}<div class="invalid-feedback">{{ form.notes.errors[0] }}</div>{% endif %}
@@ -162,8 +187,8 @@
                            name="receipt_image"
                            class="form-control"
                            accept="image/*,.pdf"
-                           {% if expense and expense.receipt_image %}
-                               data-existing-receipt="{{ get_receipt_url(expense.receipt_image) }}"
+                           {% if expense and expense.receipt_storage_path %}
+                               data-existing-receipt="{{ get_receipt_url(expense.receipt_storage_path) }}"
                            {% endif %}>
                     <button type="button"
                             class="btn btn-outline-secondary"
@@ -186,10 +211,10 @@
                     <small class="text-muted">
                         <i class="fas fa-info-circle me-1"></i>
                         Upload a photo of your receipt. Supported formats: JPG, PNG, GIF, PDF. Max size: 5MB.
-                        {% if expense and expense.receipt_image %}
+                        {% if expense and expense.receipt_storage_path %}
                             <br>
                             <div class="d-flex gap-2 mt-2">
-                                <a href="{{ get_receipt_url(expense.receipt_image) }}" class="text-primary">
+                                <a href="{{ get_receipt_url(expense.receipt_storage_path) }}" class="text-primary">
                                     <i class="fas fa-eye me-1"></i>View current receipt
                                 </a>
                                 <button type="button"
@@ -261,7 +286,7 @@
         <div class="row mb-3">
             <div class="col-12 tag-selector-widget">
                 <div class="d-flex justify-content-between align-items-center mb-2">
-                    {{ form.tags.label(class="form-label mb-0") }}
+                    {{ expense_field_label(form.tags, 'mb-0') }}
                     <a href="#" id="manageTagsLink" class="btn btn-sm btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#tagEditorModal">
                         <i class="fas fa-cog me-1"></i>Manage Tags
                     </a>

@@ -13,8 +13,8 @@ from app.api import validate_api_csrf
 from app.constants import get_cuisine_names
 from app.extensions import db
 from app.loyalty import services as loyalty_services
-from app.merchants.forms import MerchantImportForm
 from app.merchants import bp, services as merchant_services
+from app.merchants.forms import MerchantImportForm
 from app.restaurants.models import Restaurant
 
 
@@ -632,9 +632,7 @@ def api_list_merchants() -> Any:
     merchants = merchant_services.get_merchants(current_user.id, filters)
 
     return (
-        jsonify(
-            [_merchant_api_payload(merchant) for merchant in merchants]
-        ),
+        jsonify([_merchant_api_payload(merchant) for merchant in merchants]),
         200,
     )
 
@@ -655,11 +653,7 @@ def api_suggest_merchant() -> Any:
         return jsonify({"merchant": None}), 200
 
     return (
-        jsonify(
-            {
-                "merchant": _merchant_api_payload(merchant)
-            }
-        ),
+        jsonify({"merchant": _merchant_api_payload(merchant)}),
         200,
     )
 

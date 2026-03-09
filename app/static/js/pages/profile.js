@@ -3,6 +3,8 @@
  * Handles character counters, avatar picker initialization, and tag manager
  */
 
+import { attachIntlPhoneFormatting } from '../utils/contact-fields.js';
+
 function initializeTagManager() {
   try {
     // TagManager is already created and initialized globally from tag-manager.js
@@ -21,6 +23,8 @@ function initializeTagManager() {
 }
 
 export function initProfile() {
+  attachIntlPhoneFormatting('.profile-form', ['phone']);
+
   // Character counters
   const textareas = document.querySelectorAll('input[maxlength], textarea[maxlength]');
 

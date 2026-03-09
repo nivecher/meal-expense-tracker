@@ -37,24 +37,24 @@ This document serves as the single source of truth for the implementation status
 
 ### 2. Expense Management
 
-| Feature                 | Status | Implementation                                   | Code Location                                                             | Completion |
-| ----------------------- | ------ | ------------------------------------------------ | ------------------------------------------------------------------------- | ---------- |
-| Add Expense             | ✅     | Complete                                         | `app/expenses/routes.py:218`                                              | 100%       |
-| Edit Expense            | ✅     | Complete                                         | `app/expenses/routes.py:312`                                              | 100%       |
-| Delete Expense          | ✅     | Complete                                         | `app/expenses/routes.py:586`                                              | 100%       |
-| List Expenses           | ✅     | Complete                                         | `app/expenses/routes.py:504`                                              | 100%       |
-| Expense Calendar View   | ✅     | Calendar tab, month/week/day, tooltips, timezone | `app/templates/expenses/list.html`, `app/static/js/pages/expense-list.js` | 100%       |
-| Expense Details         | ✅     | Complete                                         | `app/expenses/routes.py:567`                                              | 100%       |
-| Expense Filtering       | ✅     | Complete                                         | `app/expenses/services.py`                                                | 100%       |
-| Expense Search          | ✅     | Complete                                         | `app/expenses/services.py`                                                | 100%       |
-| CSV Export              | ✅     | Complete (restore-friendly fields)               | `app/expenses/routes.py:850`                                              | 100%       |
-| CSV Import              | ✅     | Complete (supports restore fields)               | `app/expenses/routes.py:970`                                              | 100%       |
-| JSON Export             | ✅     | Complete                                         | `app/expenses/routes.py:850`                                              | 100%       |
-| Receipt Image Upload    | ✅     | Complete                                         | `app/expenses/models.py:248`                                              | 100%       |
-| Receipt OCR             | ✅     | Complete (AWS Textract)                          | `app/services/ocr_service.py`                                             | 100%       |
-| Receipt OCR Alternative | ✅     | Production Ready (receipt-ocr + Gemini)          | `lambda-receipt-ocr/`                                                     | 100%       |
-| Receipt Reconciliation  | ✅     | Complete                                         | `app/expenses/services.py:2255`                                           | 100%       |
-| Auto-save Draft         | ✅     | Complete                                         | `app/static/js/utils/auto-save.js`                                        | 100%       |
+| Feature                 | Status | Implementation                                   | Code Location                                                                          | Completion |
+| ----------------------- | ------ | ------------------------------------------------ | -------------------------------------------------------------------------------------- | ---------- |
+| Add Expense             | ✅     | Complete                                         | `app/expenses/routes.py:218`                                                           | 100%       |
+| Edit Expense            | ✅     | Complete                                         | `app/expenses/routes.py:312`                                                           | 100%       |
+| Delete Expense          | ✅     | Complete                                         | `app/expenses/routes.py:586`                                                           | 100%       |
+| List Expenses           | ✅     | Complete; infinite scroll, SQL pagination        | `app/expenses/routes.py:791`, `app/expenses/services.py` (get_user_expenses_paginated) | 100%       |
+| Expense Calendar View   | ✅     | Calendar tab, month/week/day, tooltips, timezone | `app/templates/expenses/list.html`, `app/static/js/pages/expense-list.js`              | 100%       |
+| Expense Details         | ✅     | Complete                                         | `app/expenses/routes.py:567`                                                           | 100%       |
+| Expense Filtering       | ✅     | Complete                                         | `app/expenses/services.py`                                                             | 100%       |
+| Expense Search          | ✅     | Complete                                         | `app/expenses/services.py`                                                             | 100%       |
+| CSV Export              | ✅     | Complete (restore-friendly fields)               | `app/expenses/routes.py:850`                                                           | 100%       |
+| CSV Import              | ✅     | Complete (supports restore fields)               | `app/expenses/routes.py:970`                                                           | 100%       |
+| JSON Export             | ✅     | Complete                                         | `app/expenses/routes.py:850`                                                           | 100%       |
+| Receipt Image Upload    | ✅     | Complete                                         | `app/expenses/models.py:248`                                                           | 100%       |
+| Receipt OCR             | ✅     | Complete (AWS Textract)                          | `app/services/ocr_service.py`                                                          | 100%       |
+| Receipt OCR Alternative | ✅     | Production Ready (receipt-ocr + Gemini)          | `lambda-receipt-ocr/`                                                                  | 100%       |
+| Receipt Reconciliation  | ✅     | Complete                                         | `app/expenses/services.py:2255`                                                        | 100%       |
+| Auto-save Draft         | ✅     | Complete                                         | `app/static/js/utils/auto-save.js`                                                     | 100%       |
 
 ### 3. Expense Categorization
 
@@ -81,36 +81,39 @@ This document serves as the single source of truth for the implementation status
 
 ### 5. Restaurant Management
 
-| Feature               | Status | Implementation | Code Location                   | Completion |
-| --------------------- | ------ | -------------- | ------------------------------- | ---------- |
-| Add Restaurant        | ✅     | Complete       | `app/restaurants/routes.py:90`  | 100%       |
-| Edit Restaurant       | ✅     | Complete       | `app/restaurants/routes.py:210` | 100%       |
-| Delete Restaurant     | ✅     | Complete       | `app/restaurants/routes.py:243` | 100%       |
-| List Restaurants      | ✅     | Complete       | `app/restaurants/routes.py:39`  | 100%       |
-| Restaurant Details    | ✅     | Complete       | `app/restaurants/routes.py:149` | 100%       |
-| Restaurant Search     | ✅     | Complete       | `app/restaurants/routes.py:786` | 100%       |
-| Restaurant Filtering  | ✅     | Complete       | `app/restaurants/services.py`   | 100%       |
-| CSV Export            | ✅     | Complete       | `app/restaurants/routes.py:318` | 100%       |
-| CSV Import            | ✅     | Complete       | `app/restaurants/routes.py:458` | 100%       |
-| Restaurant Statistics | ✅     | Complete       | `app/restaurants/services.py`   | 100%       |
-| Duplicate Detection   | ✅     | Complete       | `app/restaurants/routes.py:663` | 100%       |
-| Rewards Programs      | ⏳     | Planned        | TBD                             | 0%         |
+| Feature                        | Status | Implementation                                                                                                       | Code Location                                                                                                                           | Completion |
+| ------------------------------ | ------ | -------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- | ---------- |
+| Add Restaurant                 | ✅     | Complete                                                                                                             | `app/restaurants/routes.py:90`                                                                                                          | 100%       |
+| Edit Restaurant                | ✅     | Complete                                                                                                             | `app/restaurants/routes.py:210`                                                                                                         | 100%       |
+| Delete Restaurant              | ✅     | Complete                                                                                                             | `app/restaurants/routes.py:243`                                                                                                         | 100%       |
+| List Restaurants               | ✅     | Complete; infinite scroll, SQL pagination                                                                            | `app/restaurants/routes.py:827`, `app/restaurants/services.py` (get_restaurants_with_stats_paginated)                                   | 100%       |
+| Restaurant Details             | ✅     | Complete                                                                                                             | `app/restaurants/routes.py:149`                                                                                                         | 100%       |
+| Restaurant Search              | ✅     | Complete                                                                                                             | `app/restaurants/routes.py:786`                                                                                                         | 100%       |
+| Restaurant Filtering           | ✅     | Complete                                                                                                             | `app/restaurants/services.py`                                                                                                           | 100%       |
+| CSV Export                     | ✅     | Complete                                                                                                             | `app/restaurants/routes.py:318`                                                                                                         | 100%       |
+| CSV Import                     | ✅     | Complete                                                                                                             | `app/restaurants/routes.py:458`                                                                                                         | 100%       |
+| Restaurant Statistics          | ✅     | Complete                                                                                                             | `app/restaurants/services.py`                                                                                                           | 100%       |
+| Duplicate Detection            | ✅     | Complete                                                                                                             | `app/restaurants/routes.py:663`                                                                                                         | 100%       |
+| Merchant dimensions            | ✅     | Service Level, Cuisine, Menu Focus, and grouped Format Category taxonomy shared across merchant and restaurant flows | `app/merchants/services.py`, `app/templates/merchants/form.html`, `app/templates/restaurants/form.html`, `app/templates/main/help.html` | 100%       |
+| Restaurant & merchant favicons | ✅     | Canonical URLs, host candidates (www/apex), multi-source fallback; optional merchant favicon URL override            | `app/static/js/utils/robust-favicon-handler.js`, `app/utils/url_utils.py`, `app/merchants/models.py` (favicon_url)                      | 100%       |
+| Rewards Programs               | ⏳     | Planned                                                                                                              | TBD                                                                                                                                     | 0%         |
 
 ### 6. Google Maps Integration
 
-| Feature                   | Status | Implementation | Code Location                                                                                               | Completion |
-| ------------------------- | ------ | -------------- | ----------------------------------------------------------------------------------------------------------- | ---------- |
-| Google Places API         | ✅     | Complete       | `app/static/js/utils/google-maps.js`                                                                        | 100%       |
-| Address Autocomplete      | ✅     | Complete       | `app/api/routes.py:90`                                                                                      | 100%       |
-| Place Details             | ✅     | Complete       | `app/api/routes.py:123`                                                                                     | 100%       |
-| Restaurant Search         | ✅     | Complete       | `app/restaurants/routes.py:40`                                                                              | 100%       |
-| Google Places Integration | ✅     | Complete       | `app/restaurants/routes.py:693`, [GOOGLE_PLACES_FIELD_MAPPING.md](./GOOGLE_PLACES_FIELD_MAPPING.md)         | 100%       |
-| Map-Based Search          | ✅     | Complete       | `app/static/js/components/map-restaurant-search.js`                                                         | 100%       |
-| Map Display               | ✅     | Complete       | `app/templates/restaurants/list.html` (`tab=places`), `app/static/js/components/places-map-view.js`         | 100%       |
-| Places Tab Map View       | ✅     | Complete       | `/restaurants/places`, `app/templates/restaurants/list.html`, `app/static/js/components/places-map-view.js` | 100%       |
-| API Key Management        | ✅     | Complete       | `app/main/routes.py:222`                                                                                    | 100%       |
-| Fallback Handling         | ✅     | Complete       | `app/static/js/utils/error-recovery.js`                                                                     | 100%       |
-| Modern API Detection      | ✅     | Complete       | `app/static/js/utils/google-maps.js`                                                                        | 100%       |
+| Feature                   | Status | Implementation                                                                                                                                                    | Code Location                                                                                                                                                                        | Completion |
+| ------------------------- | ------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------- |
+| Google Places API         | ✅     | Complete                                                                                                                                                          | `app/static/js/utils/google-maps.js`                                                                                                                                                 | 100%       |
+| Address Autocomplete      | ✅     | Complete                                                                                                                                                          | `app/api/routes.py:90`                                                                                                                                                               | 100%       |
+| Place Details             | ✅     | Complete                                                                                                                                                          | `app/api/routes.py:123`                                                                                                                                                              | 100%       |
+| Restaurant Search         | ✅     | Complete                                                                                                                                                          | `app/restaurants/routes.py:40`                                                                                                                                                       | 100%       |
+| Google Places Integration | ✅     | Complete                                                                                                                                                          | `app/restaurants/routes.py:693`, [GOOGLE_PLACES_FIELD_MAPPING.md](./GOOGLE_PLACES_FIELD_MAPPING.md)                                                                                  | 100%       |
+| Google-filled description | ✅     | Default description from place details (cuisine, type, service level, price, rating); quick-add and form add persist it; no extra API calls; user edits preserved | `app/services/google_places_service.py` (generate_description), `app/restaurants/routes.py` (\_prepare_restaurant_form), `app/restaurants/models.py` (\_update_description_fallback) | 100%       |
+| Map-Based Search          | ✅     | Complete                                                                                                                                                          | `app/static/js/components/map-restaurant-search.js`                                                                                                                                  | 100%       |
+| Map Display               | ✅     | Complete                                                                                                                                                          | `app/templates/restaurants/list.html` (`tab=places`), `app/static/js/components/places-map-view.js`                                                                                  | 100%       |
+| Places Tab Map View       | ✅     | Complete                                                                                                                                                          | `/restaurants/places`, `app/templates/restaurants/list.html`, `app/static/js/components/places-map-view.js`                                                                          | 100%       |
+| API Key Management        | ✅     | Complete                                                                                                                                                          | `app/main/routes.py:222`                                                                                                                                                             | 100%       |
+| Fallback Handling         | ✅     | Complete                                                                                                                                                          | `app/static/js/utils/error-recovery.js`                                                                                                                                              | 100%       |
+| Modern API Detection      | ✅     | Complete                                                                                                                                                          | `app/static/js/utils/google-maps.js`                                                                                                                                                 | 100%       |
 
 ### 7. Reporting & Analytics
 

@@ -61,6 +61,43 @@ class TestGooglePlaceIdConstraint:
         assert restaurant1.google_place_id is None
         assert restaurant2.google_place_id is None
 
+    def test_create_restaurant_normalizes_blank_google_place_id_to_null(self, session, test_user) -> None:
+        """Blank Google Place IDs should be stored as NULL, not empty strings."""
+
+        class MockForm:
+            def __init__(self, name: str):
+                self.name = MagicMock()
+                self.name.data = name
+                self.city = MagicMock()
+                self.city.data = "Test City"
+                self.google_place_id = MagicMock()
+                self.google_place_id.data = "   "
+
+            def populate_obj(self, obj):
+                obj.name = self.name.data
+                obj.city = self.city.data
+                obj.google_place_id = "   "
+                obj.type = "restaurant"
+                obj.description = "Test description"
+                obj.address_line_1 = "123 Test St"
+                obj.state = "TS"
+                obj.postal_code = "12345"
+                obj.country = "Test Country"
+                obj.phone = "123-456-7890"
+                obj.website = "https://test.com"
+                obj.email = "test@example.com"
+                obj.cuisine = "Test Cuisine"
+                obj.rating = None
+                obj.notes = "Test notes"
+
+        restaurant1, is_new1 = create_restaurant(test_user.id, MockForm("Restaurant 1"))
+        restaurant2, is_new2 = create_restaurant(test_user.id, MockForm("Restaurant 2"))
+
+        assert is_new1 is True
+        assert is_new2 is True
+        assert restaurant1.google_place_id is None
+        assert restaurant2.google_place_id is None
+
     def test_validate_restaurant_uniqueness_google_place_id_duplicate(self, session, test_user) -> None:
         """Test validation function catches Google Place ID duplicates."""
         google_place_id = "ChIJ_test_validation_123"
@@ -158,7 +195,6 @@ class TestGooglePlaceIdConstraint:
                 obj.website = "https://newtest.com"
                 obj.email = "newtest@example.com"
                 obj.cuisine = "Test Cuisine"
-                obj.is_chain = False
                 obj.rating = None
                 obj.notes = "Test notes"
 
@@ -223,7 +259,6 @@ class TestGooglePlaceIdConstraint:
                 obj.website = "https://test.com"
                 obj.email = "test1@example.com"
                 obj.cuisine = "Test Cuisine"
-                obj.is_chain = False
                 obj.rating = None
                 obj.notes = "Test notes"
 
@@ -250,7 +285,6 @@ class TestGooglePlaceIdConstraint:
                 obj.website = "https://test2.com"
                 obj.email = "test2@example.com"
                 obj.cuisine = "Test Cuisine"
-                obj.is_chain = False
                 obj.rating = None
                 obj.notes = "Test notes"
 

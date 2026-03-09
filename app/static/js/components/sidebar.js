@@ -1,3 +1,4 @@
+
 /**
  * Collapsible left sidebar behavior.
  */

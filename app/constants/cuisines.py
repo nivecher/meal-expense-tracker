@@ -10,9 +10,14 @@ from typing import Dict, List, Optional
 GOOGLE_CUISINE_MAPPING = {
     # Core restaurant types that Google Places API supports
     "american_restaurant": "American",
+    "asian_restaurant": "Asian",
+    "cajun_restaurant": "Cajun",
     "chinese_restaurant": "Chinese",
+    "fusion_restaurant": "Fusion",
+    "hawaiian_restaurant": "Hawaiian",
     "italian_restaurant": "Italian",
     "japanese_restaurant": "Japanese",
+    "latin_restaurant": "Latin",
     "mexican_restaurant": "Mexican",
     "french_restaurant": "French",
     "german_restaurant": "German",
@@ -27,6 +32,8 @@ GOOGLE_CUISINE_MAPPING = {
     "turkish_restaurant": "Turkish",
     "moroccan_restaurant": "Moroccan",
     "middle_eastern_restaurant": "Middle Eastern",
+    "latin_american_restaurant": "Latin American",
+    "tex_mex_restaurant": "Tex-Mex",
     # Specialty restaurant types
     "pizza_restaurant": "Pizza",
     "seafood_restaurant": "Seafood",
@@ -48,9 +55,14 @@ CUISINES: dict[str, dict[str, str]] = {}
 # Color scheme for consistent UI display
 _CUISINE_COLORS = {
     "American": {"color": "#0d6efd", "icon": "flag-usa"},
+    "Asian": {"color": "#6610f2", "icon": "bowl-food"},
+    "Cajun": {"color": "#fd7e14", "icon": "shrimp"},
     "Chinese": {"color": "#dc3545", "icon": "bowl-rice"},
+    "Fusion": {"color": "#20c997", "icon": "utensils"},
+    "Hawaiian": {"color": "#0dcaf0", "icon": "umbrella-beach"},
     "Italian": {"color": "#198754", "icon": "pizza-slice"},
     "Japanese": {"color": "#6f42c1", "icon": "seedling"},
+    "Latin": {"color": "#fd7e14", "icon": "pepper-hot"},
     "Mexican": {"color": "#fd7e14", "icon": "pepper-hot"},
     "French": {"color": "#6610f2", "icon": "utensils"},
     "German": {"color": "#6c757d", "icon": "utensils"},
@@ -65,6 +77,8 @@ _CUISINE_COLORS = {
     "Turkish": {"color": "#dc3545", "icon": "utensils"},
     "Moroccan": {"color": "#fd7e14", "icon": "utensils"},
     "Middle Eastern": {"color": "#fd7e14", "icon": "utensils"},
+    "Latin American": {"color": "#fd7e14", "icon": "pepper-hot"},
+    "Tex-Mex": {"color": "#dc3545", "icon": "pepper-hot"},
     "Pizza": {"color": "#198754", "icon": "pizza-slice"},
     "Seafood": {"color": "#0dcaf0", "icon": "fish"},
     "Steakhouse": {"color": "#dc3545", "icon": "drumstick-bite"},

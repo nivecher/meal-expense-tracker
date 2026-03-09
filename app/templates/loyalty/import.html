@@ -1,0 +1,119 @@
+{% extends "base.html" %} {% block title %}Import Loyalty Programs{% endblock title %} {% block content %}
+<div class="container mt-4">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <ul class="nav nav-tabs mb-3" role="tablist">
+                <li class="nav-item" role="presentation">
+                    <a class="nav-link" href="{{ url_for('merchants.list_merchants') }}"
+                        ><i class="fas fa-list me-1"></i>Merchants</a
+                    >
+                </li>
+                <li class="nav-item" role="presentation">
+                    <a class="nav-link" href="{{ url_for('merchants.review_restaurant_associations') }}"
+                        ><i class="fas fa-link me-1"></i>Associations</a
+                    >
+                </li>
+                <li class="nav-item" role="presentation">
+                    <a class="nav-link active" href="{{ url_for('loyalty.list_rewards_programs') }}"
+                        ><i class="fas fa-award me-1"></i>Loyalty</a
+                    >
+                </li>
+            </ul>
+            <div class="card">
+                <div class="card-header bg-white py-3">
+                    <h2 class="h4 mb-0">Import Loyalty Programs</h2>
+                </div>
+                <div class="card-body">
+                    <div class="mb-4">
+                        <div class="d-flex align-items-center justify-content-between mb-3">
+                            <h3 class="h5 mb-0">Quick Start</h3>
+                            <div class="d-flex gap-2">
+                                <a
+                                    href="{{ url_for('loyalty.export_rewards_programs', format='csv', sample='true') }}"
+                                    class="btn btn-sm btn-outline-primary">
+                                    <i class="fas fa-download me-1"></i>Sample CSV
+                                </a>
+                                <a
+                                    href="{{ url_for('loyalty.export_rewards_programs', format='json', sample='true') }}"
+                                    class="btn btn-sm btn-outline-secondary">
+                                    <i class="fas fa-code me-1"></i>Sample JSON
+                                </a>
+                            </div>
+                        </div>
+
+                        <div class="alert alert-primary">
+                            <i class="fas fa-upload me-2"></i>
+                            <strong>Upload a CSV or JSON file with loyalty data.</strong>
+                            Required: <code>name</code>. Optional: website, portal_url, notes, membership_email,
+                            membership_phone, portal_username, account_number, tier_name, account_notes,
+                            linked_merchants.
+                        </div>
+                    </div>
+
+                    <form
+                        method="post"
+                        enctype="multipart/form-data"
+                        id="import-form"
+                        class="needs-validation"
+                        novalidate>
+                        {{ form.hidden_tag() }}
+                        <div class="mb-3">
+                            <label for="file" class="form-label">Select CSV or JSON file</label>
+                            {{ form.file(class_="form-control", accept=".csv,.json", id="file") }}
+                            <div class="invalid-feedback">Please select a CSV or JSON file to upload.</div>
+                            <div class="form-text">Linked merchants should be separated with semicolons.</div>
+                        </div>
+
+                        {% if import_summary %}
+                        <div class="alert alert-info">
+                            <h5 class="alert-heading"><i class="fas fa-info-circle me-2"></i>Import Summary</h5>
+                            <div class="row">
+                                <div class="col-md-4"
+                                    ><strong class="text-success">Imported:</strong> {{
+                                    import_summary.get('success_count', 0) }}</div
+                                >
+                                <div class="col-md-4"
+                                    ><strong class="text-warning">Skipped:</strong> {{
+                                    import_summary.get('skipped_count', 0) }}</div
+                                >
+                                <div class="col-md-4"
+                                    ><strong class="text-danger">Errors:</strong> {{ import_summary.get('error_count',
+                                    0) }}</div
+                                >
+                            </div>
+                        </div>
+                        {% endif %} {% if warnings %}
+                        <div class="alert alert-warning">
+                            <h5 class="alert-heading"><i class="fas fa-triangle-exclamation me-2"></i>Warnings</h5>
+                            <ul class="mb-0">
+                                {% for warning in warnings[:10] %}
+                                <li><code>{{ warning }}</code></li>
+                                {% endfor %}
+                            </ul>
+                        </div>
+                        {% endif %} {% if errors %}
+                        <div class="alert alert-danger">
+                            <h5 class="alert-heading"><i class="fas fa-exclamation-triangle me-2"></i>Import Errors</h5>
+                            <ul class="mb-0">
+                                {% for error in errors[:10] %}
+                                <li><code>{{ error }}</code></li>
+                                {% endfor %}
+                            </ul>
+                        </div>
+                        {% endif %}
+
+                        <div class="d-flex gap-2">
+                            {{ form.submit(class_="btn btn-primary") }}
+                            <a href="{{ url_for('loyalty.list_rewards_programs') }}" class="btn btn-outline-secondary">
+                                <i class="fas fa-times me-1"></i>Cancel
+                            </a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock content %} {% block scripts %} {{ super() }}
+<script src="{{ url_for('static', filename='js/pages/restaurant-import.js') }}"></script>
+{% endblock scripts %}

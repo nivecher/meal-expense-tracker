@@ -39,32 +39,54 @@
   padding: 0;
 }
 
-/* Card view: wide cards; multiple per row only when there’s enough space (high min) */
+/* Card view: rich cards with columns based on actual content width */
+
+#restaurant-list-results {
+  container-type: inline-size;
+  container-name: restaurant-results;
+}
 
 #card-view-container {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr));
-  gap: 0.75rem;
-  margin-left: 0;
-  margin-right: 0;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 1rem;
   width: 100%;
 }
 
-@media (width >= 992px) {
+#card-view-container > .col {
+  min-width: 0;
+  max-width: none;
+  padding: 0;
+  width: auto;
+}
+
+/*
+ * Infinite-scroll chunks are appended above the visible card grid first,
+ * then moved into #card-view-container by restaurant-list.js.
+ * Keep the temporary buffer hidden to prevent a visible layout flash.
+ */
+.restaurant-chunk-buffer,
+.restaurant-chunk-buffer .restaurant-chunk-cards {
+  display: none;
+}
+
+@container restaurant-results (min-width: 44rem) {
   #card-view-container {
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
-#card-view-container .col {
-  min-width: 0;
-  max-width: none;
-  flex: none;
-  padding: 0;
-  width: 100%;
+@container restaurant-results (min-width: 64rem) {
+  #card-view-container {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
 }
 
-/* Restaurant list cards: full-width card, horizontal layout so nothing is squished */
+@container restaurant-results (min-width: 86rem) {
+  #card-view-container {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
 
 .restaurant-list-card {
   min-width: 0;
@@ -78,33 +100,31 @@
   overflow: visible;
 }
 
-/* One main row: identity | details | meta – uses full width */
 .restaurant-list-card .restaurant-list-card-main {
   display: flex;
-  flex-wrap: wrap;
-  align-items: flex-start;
-  gap: 1rem 1.5rem;
+  flex-direction: column;
+  gap: 0.75rem;
   min-width: 0;
   overflow: visible;
+  height: 100%;
 }
 
 .restaurant-list-card .restaurant-list-card-identity {
-  flex: 0 1 auto;
-  min-width: 140px;
+  min-width: 0;
   max-width: 100%;
 }
 
 .restaurant-list-card .restaurant-list-card-details {
-  flex: 1 1 220px;
+  flex: 1 1 auto;
   min-width: 0;
 }
 
 .restaurant-list-card .restaurant-list-card-meta {
-  flex: 0 0 auto;
   display: flex;
   flex-direction: column;
-  align-items: flex-end;
+  align-items: stretch;
   gap: 0.5rem;
+  margin-top: auto;
 }
 
 .restaurant-list-card .restaurant-list-card-header {
@@ -117,12 +137,21 @@
   width: 100%;
 }
 
+.restaurant-list-card .restaurant-list-card-header-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+  width: 100%;
+}
+
 .restaurant-list-card .restaurant-list-card-title-block {
   display: flex;
   align-items: flex-start;
   gap: 0.5rem;
   min-width: 0;
   max-width: 100%;
+  flex: 1 1 auto;
 }
 
 .restaurant-list-card .restaurant-list-card-title-block .card-title {
@@ -153,6 +182,25 @@
   flex-shrink: 0;
 }
 
+.restaurant-list-card .restaurant-list-card-merchant-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
+  min-width: 0;
+  width: 100%;
+}
+
+.restaurant-list-card .restaurant-rating-badge {
+  flex-shrink: 0;
+}
+
+.restaurant-list-card .restaurant-merchant-badge {
+  display: inline-flex;
+  align-items: center;
+  max-width: 100%;
+}
+
 .restaurant-list-card .restaurant-address-block {
   min-width: 0;
   word-break: break-word;
@@ -169,8 +217,8 @@
 .restaurant-list-card .restaurant-list-card-footer {
   display: flex;
   flex-wrap: wrap;
-  align-items: center;
-  justify-content: flex-end;
+  align-items: flex-start;
+  justify-content: space-between;
   gap: 0.5rem;
 }
 
@@ -178,7 +226,7 @@
   display: flex;
   flex-wrap: wrap;
   gap: 0.35rem;
-  flex-shrink: 0;
+  justify-content: flex-start;
 }
 
 .no-restaurants {

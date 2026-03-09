@@ -233,9 +233,9 @@ class ProductionConfig(Config):
     TESTING: bool = False
 
 
-def get_config() -> Config:
+def get_config(env_override: str | None = None) -> Config:
     """Get the appropriate configuration based on environment."""
-    env = os.getenv("FLASK_ENV", "development").lower()
+    env = (env_override or os.getenv("FLASK_ENV", "development")).lower()
 
     configs = {
         "development": DevelopmentConfig,

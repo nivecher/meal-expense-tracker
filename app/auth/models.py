@@ -18,6 +18,7 @@ if TYPE_CHECKING:
     from sqlalchemy.engine import Connection
 
     from app.expenses.models import Category, Expense, Tag
+    from app.loyalty.models import MerchantRewardsLink, RewardsAccount, RewardsProgram
     from app.receipts.models import Receipt
     from app.restaurants.models import Restaurant
     from app.visits.models import Visit
@@ -152,6 +153,27 @@ class User(BaseModel, UserMixin):
     )
     receipts: Mapped[list[Receipt]] = relationship(
         "Receipt",
+        back_populates="user",
+        cascade="all, delete-orphan",
+        lazy="dynamic",
+        passive_deletes=True,
+    )
+    rewards_programs: Mapped[list[RewardsProgram]] = relationship(
+        "RewardsProgram",
+        back_populates="user",
+        cascade="all, delete-orphan",
+        lazy="dynamic",
+        passive_deletes=True,
+    )
+    rewards_accounts: Mapped[list[RewardsAccount]] = relationship(
+        "RewardsAccount",
+        back_populates="user",
+        cascade="all, delete-orphan",
+        lazy="dynamic",
+        passive_deletes=True,
+    )
+    merchant_rewards_links: Mapped[list[MerchantRewardsLink]] = relationship(
+        "MerchantRewardsLink",
         back_populates="user",
         cascade="all, delete-orphan",
         lazy="dynamic",

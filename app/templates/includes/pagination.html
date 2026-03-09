@@ -1,16 +1,23 @@
-{# Pagination component for consistent pagination across the site Required variables: - pagination: The pagination
-object from Flask-SQLAlchemy - endpoint: The name of the route to generate URLs for Optional variables: - url_kwargs:
-(dict) Additional URL parameters to include in the URL path - query_params: (dict) Query parameters to include in the
-URL - aria_label: (string) ARIA label for the navigation element #} {% if pagination.pages > 1 %} {% set query_params =
-query_params or {} %} {% set url_kwargs = url_kwargs or {} %}
+{# Pagination component for consistent pagination across the site.
+   Required variables:
+   - pagination: Pagination object
+   - endpoint: Route endpoint name
+   Optional variables:
+   - url_args: Pre-encoded query-string content without the leading '?'
+   - aria_label: ARIA label for the navigation element
+#}
+{% if pagination.pages > 1 %}
+{% set url_args = url_args|default('') %}
+{% set base_url = url_for(endpoint) %}
+{% set query_prefix = '?' ~ url_args ~ '&' if url_args else '?'%}
 <link rel="stylesheet" href="{{ url_for('static', filename='css/components/pagination.css') }}" />
 <nav aria-label="{{ aria_label|default('Pagination') }}" class="mt-4">
     <ul class="pagination justify-content-end mb-0">
-        {# Previous page link #} {% if pagination.has_prev %}
+        {% if pagination.has_prev %}
         <li class="page-item">
             <a
                 class="page-link"
-                href="{{ url_for(endpoint, page=pagination.prev_num, **url_kwargs, **query_params) }}"
+                href="{{ base_url }}{{ query_prefix }}page={{ pagination.prev_num }}"
                 aria-label="Previous page">
                 <span class="arrow prev"></span> Previous
             </a>
@@ -21,39 +28,50 @@ query_params or {} %} {% set url_kwargs = url_kwargs or {} %}
                 <span class="arrow prev"></span> Previous
             </span>
         </li>
-        {% endif %} {# Page numbers #} {% for page_num in pagination.iter_pages(left_edge=1, right_edge=1,
-        left_current=2, right_current=3) %} {% if page_num %} {% if page_num == pagination.page %}
+        {% endif %}
+
+        {% for page_num in pagination.iter_pages(left_edge=1, right_edge=1, left_current=2, right_current=3) %}
+        {% if page_num %}
+        {% if page_num == pagination.page %}
         <li class="page-item active" aria-current="page">
             <span class="page-link">
                 {{ page_num }}
                 <span class="visually-hidden">(current)</span>
             </span>
         </li>
-        {% else %} {% set page_query = query_params|update_dict({'page': page_num}) %}
+        {% else %}
         <li class="page-item">
             <a
                 class="page-link"
-                href="{{ url_for(endpoint, **url_kwargs, **page_query) }}"
-                aria-label="Go to page {{ page_num }}"
-                >{{ page_num }}</a
-            >
+                href="{{ base_url }}{{ query_prefix }}page={{ page_num }}"
+                aria-label="Go to page {{ page_num }}">
+                {{ page_num }}
+            </a>
         </li>
-        {% endif %} {% else %}
+        {% endif %}
+        {% else %}
         <li class="page-item disabled">
             <span class="page-link" aria-label="More pages available">
                 <span class="ellipsis">...</span>
             </span>
         </li>
-        {% endif %} {% endfor %} {# Next page link #} {% if pagination.has_next %} {% set next_query =
-        query_params|update_dict({'page': pagination.next_num}) %}
+        {% endif %}
+        {% endfor %}
+
+        {% if pagination.has_next %}
         <li class="page-item">
-            <a class="page-link" href="{{ url_for(endpoint, **url_kwargs, **next_query) }}" aria-label="Next page">
+            <a
+                class="page-link"
+                href="{{ base_url }}{{ query_prefix }}page={{ pagination.next_num }}"
+                aria-label="Next page">
                 Next <span class="arrow next"></span>
             </a>
         </li>
         {% else %}
         <li class="page-item disabled">
-            <span class="page-link" aria-label="Next page not available"> Next <span class="arrow next"></span> </span>
+            <span class="page-link" aria-label="Next page not available">
+                Next <span class="arrow next"></span>
+            </span>
         </li>
         {% endif %}
     </ul>
