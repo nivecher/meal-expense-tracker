@@ -131,9 +131,9 @@
     }
 
     .import-review-chip.skip {
-        background: #f8d7da;
-        color: #842029;
-        border-color: #f1aeb5;
+        background: #f8f9fa;
+        color: #6c757d;
+        border-color: #dee2e6;
     }
 
     .import-review-chip.create {
@@ -217,6 +217,130 @@
         font-weight: 700;
     }
 
+    .import-review-apply-group {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: flex-end;
+        gap: 0.75rem;
+    }
+
+    .import-review-apply-summary {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: flex-end;
+        gap: 0.35rem;
+    }
+
+    .import-review-summary-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+        margin-bottom: 1rem;
+    }
+
+    .import-review-toolbar {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: space-between;
+        align-items: center;
+        gap: 0.75rem;
+        margin-bottom: 1rem;
+    }
+
+    .import-review-filter-group {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+    }
+
+    .import-review-toolbar-actions {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 0.75rem;
+    }
+
+    .import-review-filter-button {
+        border: 1px solid #dee2e6;
+        background: #fff;
+        color: #495057;
+        border-radius: 999px;
+        padding: 0.35rem 0.8rem;
+        font-size: 0.8rem;
+        font-weight: 700;
+        line-height: 1;
+    }
+
+    .import-review-filter-button.is-active {
+        background: #212529;
+        border-color: #212529;
+        color: #fff;
+    }
+
+    .import-review-group-action {
+        border: 1px solid #dee2e6;
+        background: #fff;
+        color: #495057;
+        border-radius: 999px;
+        padding: 0.35rem 0.8rem;
+        font-size: 0.8rem;
+        font-weight: 700;
+        line-height: 1;
+    }
+
+    .import-review-group-toggle {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.45rem;
+        font-size: 0.85rem;
+        font-weight: 700;
+        color: #495057;
+    }
+
+    .import-review-section-row td {
+        background: #f8f9fa;
+        border-top: 1px solid #dee2e6;
+        border-bottom: 1px solid #dee2e6;
+        padding: 0.6rem 0.75rem;
+    }
+
+    .import-review-section-label {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.45rem;
+        font-size: 0.82rem;
+        font-weight: 800;
+        text-transform: uppercase;
+        letter-spacing: 0.03em;
+        color: #495057;
+    }
+
+    .import-review-section-toggle {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        width: 100%;
+        border: 0;
+        background: transparent;
+        padding: 0;
+        color: inherit;
+        text-align: left;
+    }
+
+    .import-review-section-toggle-icon {
+        font-size: 0.8rem;
+        font-weight: 800;
+        color: #6c757d;
+        min-width: 0.75rem;
+    }
+
+    .import-review-section-toggle-main {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.45rem;
+    }
+
     .import-review-compare-card-title {
         display: flex;
         justify-content: space-between;
@@ -279,9 +403,9 @@
     }
 
     .import-review-row-status.review {
-        color: #664d03;
-        background: #fff3cd;
-        border-color: #ffe69c;
+        color: #084298;
+        background: #cfe2ff;
+        border-color: #9ec5fe;
     }
 
     .import-review-row-status.skipped {
@@ -336,6 +460,26 @@
         </div>
     </div>
 
+    <div class="import-review-summary-row" data-import-review-type-counts></div>
+
+    <div class="import-review-toolbar">
+        <div class="import-review-filter-group" role="group" aria-label="Filter import review rows">
+            <button type="button" class="import-review-filter-button is-active" data-row-filter="all">All</button>
+            <button type="button" class="import-review-filter-button" data-row-filter="skipped">Skipped</button>
+            <button type="button" class="import-review-filter-button" data-row-filter="blocked">Blocked</button>
+            <button type="button" class="import-review-filter-button" data-row-filter="create">Create</button>
+            <button type="button" class="import-review-filter-button" data-row-filter="update">Update</button>
+        </div>
+        <div class="import-review-toolbar-actions">
+            <button type="button" class="import-review-group-action" id="expand_all_groups">Expand all</button>
+            <button type="button" class="import-review-group-action" id="collapse_all_groups">Collapse all</button>
+            <label class="import-review-group-toggle" for="group_rows_by_type">
+                <input type="checkbox" id="group_rows_by_type" checked />
+                Group rows by type
+            </label>
+        </div>
+    </div>
+
     {% if errors %}
     <div class="alert alert-danger">
         <h5 class="alert-heading">Import Review Errors</h5>
@@ -354,9 +498,12 @@
         <div class="card import-review-card">
             <div class="card-header bg-white d-flex flex-wrap justify-content-between align-items-center gap-2">
                 <div class="fw-semibold">Expense Reconciliation</div>
-                <button type="submit" class="btn btn-primary">
-                    <i class="fas fa-file-import me-1"></i>Apply Import Actions
-                </button>
+                <div class="import-review-apply-group">
+                    <div class="import-review-apply-summary" data-import-review-summary></div>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-file-import me-1"></i>Apply Import Actions
+                    </button>
+                </div>
             </div>
             <div class="card-body p-0">
                 <div class="table-responsive">
@@ -369,7 +516,7 @@
                                 <th>Actions</th>
                             </tr>
                         </thead>
-                        <tbody>
+                        <tbody id="import_review_rows">
                             {% for row in review_rows %} {% set duplicate_count = row.duplicate_candidates|length %} {%
                             set suggested_restaurant = row.restaurant_candidates[0] if row.restaurant_candidates else
                             None %} {% set preview_duplicate = row.duplicate_candidates[0] if row.duplicate_candidates
@@ -377,6 +524,7 @@
                             preview_duplicate else None %}
                             <tr
                                 data-row-number="{{ row.row_number }}"
+                                data-suggested-restaurant-id="{{ row.suggested_restaurant_id or '' }}"
                                 data-duplicate-candidates-by-restaurant="{{ row.get('duplicate_candidates_by_restaurant', {})|tojson|forceescape }}"
                                 data-all-duplicate-candidates="{{ row.get('all_duplicate_candidates', [])|tojson|forceescape }}">
                                 <td>
@@ -391,7 +539,39 @@
                                 </td>
                                 <td>
                                     <div class="import-review-compare-card">
-                                        <div class="import-review-section-title">Imported Expense</div>
+                                        <div class="import-review-section-title">Import Restaurant Info</div>
+                                        <div class="import-review-compare-fields">
+                                            <div class="import-review-compare-label">Payee</div>
+                                            <div
+                                                class="import-review-compare-value {% if row.restaurant_name %}add{% else %}unchanged{% endif %}">
+                                                {{ row.restaurant_name or '(None)' }}
+                                            </div>
+
+                                            <div class="import-review-compare-label">Address</div>
+                                            <div
+                                                class="import-review-compare-value {% if row.restaurant_address %}add{% else %}unchanged{% endif %}">
+                                                {{ row.restaurant_address or '(None)' }}
+                                            </div>
+
+                                            <div class="import-review-compare-label">City</div>
+                                            <div
+                                                class="import-review-compare-value {% if row.restaurant_city %}add{% else %}unchanged{% endif %}">
+                                                {{ row.restaurant_city or '(None)' }}
+                                            </div>
+
+                                            <div class="import-review-compare-label">State</div>
+                                            <div
+                                                class="import-review-compare-value {% if row.restaurant_state %}add{% else %}unchanged{% endif %}">
+                                                {{ row.restaurant_state or '(None)' }}
+                                            </div>
+
+                                            <div class="import-review-compare-label">Postal code</div>
+                                            <div
+                                                class="import-review-compare-value {% if row.restaurant_postal_code %}add{% else %}unchanged{% endif %}">
+                                                {{ row.restaurant_postal_code or '(None)' }}
+                                            </div>
+                                        </div>
+                                        <div class="import-review-section-title mt-3">Imported Expense</div>
                                         <div class="small text-muted mb-2">
                                             Source: {{ 'Simplifi CSV' if row.import_source_type == 'simplifi' else 'Standard CSV' }}
                                         </div>
@@ -491,45 +671,73 @@
                                             {% endfor %}
                                         </ul>
                                         {% endif %}
-                                        <div class="mt-3">
-                                            <div class="import-review-section-title">Import Restaurant Info</div>
-                                            <div class="import-review-compare-fields">
-                                                <div class="import-review-compare-label">Payee</div>
-                                                <div
-                                                    class="import-review-compare-value {% if row.restaurant_name %}add{% else %}unchanged{% endif %}">
-                                                    {{ row.restaurant_name or '(None)' }}
-                                                </div>
-
-                                                <div class="import-review-compare-label">Address</div>
-                                                <div
-                                                    class="import-review-compare-value {% if row.restaurant_address %}add{% else %}unchanged{% endif %}">
-                                                    {{ row.restaurant_address or '(None)' }}
-                                                </div>
-
-                                                <div class="import-review-compare-label">City</div>
-                                                <div
-                                                    class="import-review-compare-value {% if row.restaurant_city %}add{% else %}unchanged{% endif %}">
-                                                    {{ row.restaurant_city or '(None)' }}
-                                                </div>
-
-                                                <div class="import-review-compare-label">State</div>
-                                                <div
-                                                    class="import-review-compare-value {% if row.restaurant_state %}add{% else %}unchanged{% endif %}">
-                                                    {{ row.restaurant_state or '(None)' }}
-                                                </div>
-
-                                                <div class="import-review-compare-label">Postal code</div>
-                                                <div
-                                                    class="import-review-compare-value {% if row.restaurant_postal_code %}add{% else %}unchanged{% endif %}">
-                                                    {{ row.restaurant_postal_code or '(None)' }}
-                                                </div>
-                                            </div>
-                                        </div>
                                     </div>
                                 </td>
                                 <td>
                                     <div class="import-review-compare-card">
-                                        <div class="import-review-compare-card-title">
+                                        <div class="import-review-section-title">Restaurant Match</div>
+                                        {% if suggested_restaurant %}
+                                        <div
+                                            class="import-review-compare-fields"
+                                            id="restaurant_match_fields_{{ row.row_number }}">
+                                            <div class="import-review-compare-label">Display name</div>
+                                            <div
+                                                class="import-review-compare-value {% if suggested_restaurant and suggested_restaurant.display_name %}match{% else %}unchanged{% endif %}">
+                                                {{ suggested_restaurant.display_name if suggested_restaurant and
+                                                suggested_restaurant.display_name else '(None)' }}
+                                            </div>
+
+                                            <div class="import-review-compare-label">Restaurant name</div>
+                                            <div
+                                                class="import-review-compare-value {% if suggested_restaurant and suggested_restaurant.name %}match{% else %}unchanged{% endif %}">
+                                                {{ suggested_restaurant.name if suggested_restaurant and
+                                                suggested_restaurant.name else '(None)' }}
+                                            </div>
+
+                                            <div class="import-review-compare-label">Address</div>
+                                            <div
+                                                class="import-review-compare-value {% if suggested_restaurant and suggested_restaurant.address %}match{% else %}unchanged{% endif %}">
+                                                {{ suggested_restaurant.address if suggested_restaurant and
+                                                suggested_restaurant.address else '(None)' }}
+                                            </div>
+
+                                            <div class="import-review-compare-label">City</div>
+                                            <div
+                                                class="import-review-compare-value {% if suggested_restaurant and suggested_restaurant.city %}match{% else %}unchanged{% endif %}">
+                                                {{ suggested_restaurant.city if suggested_restaurant and
+                                                suggested_restaurant.city else '(None)' }}
+                                            </div>
+
+                                            <div class="import-review-compare-label">State</div>
+                                            <div
+                                                class="import-review-compare-value {% if suggested_restaurant and suggested_restaurant.state %}match{% else %}unchanged{% endif %}">
+                                                {{ suggested_restaurant.state if suggested_restaurant and
+                                                suggested_restaurant.state else '(None)' }}
+                                            </div>
+
+                                            <div class="import-review-compare-label">Postal code</div>
+                                            <div
+                                                class="import-review-compare-value {% if suggested_restaurant and suggested_restaurant.postal_code %}match{% else %}unchanged{% endif %}">
+                                                {{ suggested_restaurant.postal_code if suggested_restaurant and
+                                                suggested_restaurant.postal_code else '(None)' }}
+                                            </div>
+                                        </div>
+                                        {% elif row.restaurant_candidates %}
+                                        <div
+                                            class="import-review-compare-fields"
+                                            id="restaurant_match_fields_{{ row.row_number }}">
+                                            <div class="small text-muted">
+                                                Select a restaurant to preview its existing details here.
+                                            </div>
+                                        </div>
+                                        {% else %}
+                                        <div
+                                            class="import-review-compare-fields"
+                                            id="restaurant_match_fields_{{ row.row_number }}">
+                                            <div class="small text-muted">No matching restaurant was found.</div>
+                                        </div>
+                                        {% endif %}
+                                        <div class="import-review-compare-card-title mt-3">
                                             <div class="import-review-section-title mb-0">Existing Expense</div>
                                         </div>
                                         <div
@@ -551,70 +759,6 @@
                                                 {% else %}
                                                 No likely duplicate expenses found.
                                                 {% endif %}
-                                            </div>
-                                            {% endif %}
-                                        </div>
-                                        <div class="mt-3">
-                                            <div class="import-review-section-title">Restaurant Match</div>
-                                            {% if suggested_restaurant %}
-                                            <div
-                                                class="import-review-compare-fields"
-                                                id="restaurant_match_fields_{{ row.row_number }}">
-                                                <div class="import-review-compare-label">Display name</div>
-                                                <div
-                                                    class="import-review-compare-value {% if suggested_restaurant and suggested_restaurant.display_name %}match{% else %}unchanged{% endif %}">
-                                                    {{ suggested_restaurant.display_name if suggested_restaurant and
-                                                    suggested_restaurant.display_name else '(None)' }}
-                                                </div>
-
-                                                <div class="import-review-compare-label">Restaurant name</div>
-                                                <div
-                                                    class="import-review-compare-value {% if suggested_restaurant and suggested_restaurant.name %}match{% else %}unchanged{% endif %}">
-                                                    {{ suggested_restaurant.name if suggested_restaurant and
-                                                    suggested_restaurant.name else '(None)' }}
-                                                </div>
-
-                                                <div class="import-review-compare-label">Address</div>
-                                                <div
-                                                    class="import-review-compare-value {% if suggested_restaurant and suggested_restaurant.address %}match{% else %}unchanged{% endif %}">
-                                                    {{ suggested_restaurant.address if suggested_restaurant and
-                                                    suggested_restaurant.address else '(None)' }}
-                                                </div>
-
-                                                <div class="import-review-compare-label">City</div>
-                                                <div
-                                                    class="import-review-compare-value {% if suggested_restaurant and suggested_restaurant.city %}match{% else %}unchanged{% endif %}">
-                                                    {{ suggested_restaurant.city if suggested_restaurant and
-                                                    suggested_restaurant.city else '(None)' }}
-                                                </div>
-
-                                                <div class="import-review-compare-label">State</div>
-                                                <div
-                                                    class="import-review-compare-value {% if suggested_restaurant and suggested_restaurant.state %}match{% else %}unchanged{% endif %}">
-                                                    {{ suggested_restaurant.state if suggested_restaurant and
-                                                    suggested_restaurant.state else '(None)' }}
-                                                </div>
-
-                                                <div class="import-review-compare-label">Postal code</div>
-                                                <div
-                                                    class="import-review-compare-value {% if suggested_restaurant and suggested_restaurant.postal_code %}match{% else %}unchanged{% endif %}">
-                                                    {{ suggested_restaurant.postal_code if suggested_restaurant and
-                                                    suggested_restaurant.postal_code else '(None)' }}
-                                                </div>
-                                            </div>
-                                            {% elif row.restaurant_candidates %}
-                                            <div
-                                                class="import-review-compare-fields"
-                                                id="restaurant_match_fields_{{ row.row_number }}">
-                                                <div class="small text-muted">
-                                                    Select a restaurant to preview its existing details here.
-                                                </div>
-                                            </div>
-                                            {% else %}
-                                            <div
-                                                class="import-review-compare-fields"
-                                                id="restaurant_match_fields_{{ row.row_number }}">
-                                                <div class="small text-muted">No matching restaurant was found.</div>
                                             </div>
                                             {% endif %}
                                         </div>
@@ -677,47 +821,6 @@
                                 </td>
                                 <td>
                                     <div class="import-review-choice-stack">
-                                        <div
-                                            class="import-review-choice-card"
-                                            id="expense_choice_card_{{ row.row_number }}">
-                                            <div class="import-review-section-title">2. Reconcile Expense</div>
-                                            <label
-                                                for="expense_action_{{ row.row_number }}"
-                                                class="form-label small text-muted"
-                                                >Expense action</label
-                                            >
-                                            <select
-                                                class="form-select"
-                                                id="expense_action_{{ row.row_number }}"
-                                                name="expense_action_{{ row.row_number }}"
-                                                data-row-number="{{ row.row_number }}">
-                                                <option
-                                                    value="skip"
-                                                    {% if row.expense_default_action == 'skip' %}selected{% endif %}
-                                                    >Skip expense</option
-                                                >
-                                                <option
-                                                    value="update"
-                                                    {% if row.expense_default_action == 'update' %}selected{% endif %}
-                                                    >Update existing expense</option
-                                                >
-                                                <option
-                                                    value="create"
-                                                    {% if row.expense_default_action == 'create' %}selected{% endif %}
-                                                    >Create new expense</option
-                                                >
-                                            </select>
-                                            <div class="small mt-2">
-                                                <span class="text-muted">Recommended action:</span>
-                                                <span class="fw-semibold">
-                                                    {% if row.expense_default_action == 'update' %} Update existing
-                                                    expense {% elif row.expense_default_action == 'skip' and
-                                                    duplicate_count %} Skip expense {% else %} Create new expense {%
-                                                    endif %}
-                                                </span>
-                                            </div>
-                                        </div>
-
                                         <div
                                             class="import-review-choice-card"
                                             id="restaurant_choice_card_{{ row.row_number }}">
@@ -790,8 +893,7 @@
                                                         data-address="{{ restaurant.address or '' }}"
                                                         data-city="{{ restaurant.city or '' }}"
                                                         data-state="{{ restaurant.state or '' }}"
-                                                        data-postal-code="{{ restaurant.postal_code or '' }}"
-                                                        {% if row.suggested_restaurant_id == restaurant.id %}selected{% endif %}>
+                                                        data-postal-code="{{ restaurant.postal_code or '' }}">
                                                         {{ restaurant.display_name }}
                                                     </option>
                                                     {% endfor %}
@@ -815,6 +917,47 @@
                                                         return here and select it from the list.
                                                     </div>
                                                 </div>
+                                            </div>
+                                        </div>
+
+                                        <div
+                                            class="import-review-choice-card"
+                                            id="expense_choice_card_{{ row.row_number }}">
+                                            <div class="import-review-section-title">2. Reconcile Expense</div>
+                                            <label
+                                                for="expense_action_{{ row.row_number }}"
+                                                class="form-label small text-muted"
+                                                >Expense action</label
+                                            >
+                                            <select
+                                                class="form-select"
+                                                id="expense_action_{{ row.row_number }}"
+                                                name="expense_action_{{ row.row_number }}"
+                                                data-row-number="{{ row.row_number }}">
+                                                <option
+                                                    value="skip"
+                                                    {% if row.expense_default_action == 'skip' %}selected{% endif %}
+                                                    >Skip expense</option
+                                                >
+                                                <option
+                                                    value="update"
+                                                    {% if row.expense_default_action == 'update' %}selected{% endif %}
+                                                    >Update existing expense</option
+                                                >
+                                                <option
+                                                    value="create"
+                                                    {% if row.expense_default_action == 'create' %}selected{% endif %}
+                                                    >Create new expense</option
+                                                >
+                                            </select>
+                                            <div class="small mt-2">
+                                                <span class="text-muted">Recommended action:</span>
+                                                <span class="fw-semibold">
+                                                    {% if row.expense_default_action == 'update' %} Update existing
+                                                    expense {% elif row.expense_default_action == 'skip' and
+                                                    duplicate_count %} Skip expense {% else %} Create new expense {%
+                                                    endif %}
+                                                </span>
                                             </div>
                                         </div>
 
@@ -847,11 +990,14 @@
                     </table>
                 </div>
             </div>
-            <div class="card-footer bg-white d-flex justify-content-between align-items-center">
+            <div class="card-footer bg-white d-flex justify-content-between align-items-center gap-2 flex-wrap">
                 <span class="text-muted small">Rows apply according to their selected action.</span>
-                <button type="submit" class="btn btn-primary">
-                    <i class="fas fa-file-import me-1"></i>Apply Import Actions
-                </button>
+                <div class="import-review-apply-group">
+                    <div class="import-review-apply-summary" data-import-review-summary></div>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-file-import me-1"></i>Apply Import Actions
+                    </button>
+                </div>
             </div>
         </div>
     </form>
@@ -859,6 +1005,31 @@
 {% endblock content %} {% block extra_js %}
 <script>
     document.addEventListener("DOMContentLoaded", function () {
+        const reviewTableBody = document.getElementById("import_review_rows");
+        const reviewRows = Array.from(document.querySelectorAll("tr[data-row-number]"));
+        const rowTypeOrder = ["skipped", "blocked", "create", "update"];
+        let activeRowFilter = "all";
+        const collapsedRowGroups = {
+            skipped: false,
+            blocked: false,
+            create: false,
+            update: false,
+        };
+        const rowTypeLabelMap = {
+            skipped: "Skipped",
+            blocked: "Blocked",
+            create: "Create",
+            update: "Update",
+        };
+
+        function getRowNumberValue(row) {
+            return Number(row.dataset.rowNumber || "0");
+        }
+
+        function getReviewRow(rowNumber) {
+            return document.querySelector('tr[data-row-number="' + rowNumber + '"]');
+        }
+
         function getRowElements(rowNumber) {
             return {
                 expenseAction: document.getElementById("expense_action_" + rowNumber),
@@ -880,6 +1051,225 @@
                 restaurantChoiceCard: document.getElementById("restaurant_choice_card_" + rowNumber),
                 rowStatus: document.getElementById("row_status_" + rowNumber),
             };
+        }
+
+        function ensureSuggestedRestaurantSelection(rowNumber) {
+            const row = getReviewRow(rowNumber);
+            const elements = getRowElements(rowNumber);
+            if (!(row instanceof HTMLTableRowElement) || !(elements.restaurantSelect instanceof HTMLSelectElement)) {
+                return;
+            }
+
+            const suggestedRestaurantId = row.dataset.suggestedRestaurantId || "";
+            if (!suggestedRestaurantId) {
+                return;
+            }
+
+            const hasMatchingOption = Array.from(elements.restaurantSelect.options).some(function (option) {
+                return option.value === suggestedRestaurantId;
+            });
+            if (!hasMatchingOption) {
+                return;
+            }
+
+            if (!elements.restaurantSelect.value) {
+                elements.restaurantSelect.value = suggestedRestaurantId;
+            }
+        }
+
+        function getRowType(rowNumber) {
+            const elements = getRowElements(rowNumber);
+            if (!(elements.expenseAction instanceof HTMLSelectElement)) {
+                return "skipped";
+            }
+
+            ensureSuggestedRestaurantSelection(rowNumber);
+
+            const restaurantResolved =
+                elements.restaurantAction instanceof HTMLSelectElement &&
+                elements.restaurantAction.value === "match" &&
+                elements.restaurantSelect instanceof HTMLSelectElement &&
+                Boolean(elements.restaurantSelect.value);
+
+            if (!restaurantResolved) {
+                return "blocked";
+            }
+
+            if (elements.expenseAction.value === "skip") {
+                return "skipped";
+            }
+
+            return elements.expenseAction.value === "update" ? "update" : "create";
+        }
+
+        function getSectionLabel(rowType, count) {
+            return rowTypeLabelMap[rowType] + " (" + count + ")";
+        }
+
+        function buildSectionRow(rowType, count) {
+            const row = document.createElement("tr");
+            row.className = "import-review-section-row";
+            row.id = "row-section-" + rowType;
+
+            const cell = document.createElement("td");
+            cell.colSpan = 4;
+
+            const toggle = document.createElement("button");
+            toggle.type = "button";
+            toggle.className = "import-review-section-toggle";
+            toggle.dataset.rowSectionToggle = rowType;
+            toggle.setAttribute("aria-expanded", collapsedRowGroups[rowType] ? "false" : "true");
+
+            const main = document.createElement("span");
+            main.className = "import-review-section-toggle-main";
+
+            const icon = document.createElement("span");
+            icon.className = "import-review-section-toggle-icon";
+            icon.textContent = collapsedRowGroups[rowType] ? ">" : "v";
+            main.appendChild(icon);
+
+            const label = document.createElement("span");
+            label.className = "import-review-section-label";
+            label.textContent = getSectionLabel(rowType, count);
+            main.appendChild(label);
+
+            toggle.appendChild(main);
+
+            toggle.addEventListener("click", function () {
+                collapsedRowGroups[rowType] = !collapsedRowGroups[rowType];
+                updateRowVisibilityAndGrouping();
+            });
+
+            cell.appendChild(toggle);
+            row.appendChild(cell);
+
+            return row;
+        }
+
+        function setAllGroupStates(collapsed) {
+            rowTypeOrder.forEach(function (rowType) {
+                collapsedRowGroups[rowType] = collapsed;
+            });
+            updateRowVisibilityAndGrouping();
+        }
+
+        function navigateToSection(rowType) {
+            const groupToggle = document.getElementById("group_rows_by_type");
+            if (groupToggle instanceof HTMLInputElement && !groupToggle.checked) {
+                groupToggle.checked = true;
+            }
+            activeRowFilter = "all";
+            rowTypeOrder.forEach(function (type) {
+                collapsedRowGroups[type] = type !== rowType;
+            });
+            updateFilterButtonState();
+            updateRowVisibilityAndGrouping();
+
+            const section = document.getElementById("row-section-" + rowType);
+            if (section instanceof HTMLElement) {
+                section.scrollIntoView({ behavior: "smooth", block: "start" });
+            }
+        }
+
+        function buildRowCategoryBadges(counts, includeTotal) {
+            const badges = [];
+            if (includeTotal) {
+                badges.push(
+                    '<span class="import-review-chip match"><i class="fas fa-table-list"></i>Rows ' + counts.total + "</span>"
+                );
+            }
+            badges.push(
+                '<button type="button" class="import-review-chip skip" data-jump-to-section="skipped"><i class="fas fa-forward"></i>Skipped ' +
+                    counts.skipped +
+                    "</button>"
+            );
+            badges.push(
+                '<button type="button" class="import-review-chip blocked" data-jump-to-section="blocked"><i class="fas fa-link"></i>Blocked ' +
+                    counts.blocked +
+                    "</button>"
+            );
+            badges.push(
+                '<button type="button" class="import-review-chip create" data-jump-to-section="create"><i class="fas fa-receipt"></i>Create ' +
+                    counts.create +
+                    "</button>"
+            );
+            badges.push(
+                '<button type="button" class="import-review-chip update" data-jump-to-section="update"><i class="fas fa-pen"></i>Update ' +
+                    counts.update +
+                    "</button>"
+            );
+            return badges.join("");
+        }
+
+        function updateRowVisibilityAndGrouping() {
+            if (!(reviewTableBody instanceof HTMLTableSectionElement)) {
+                return;
+            }
+
+            reviewTableBody.querySelectorAll(".import-review-section-row").forEach(function (sectionRow) {
+                sectionRow.remove();
+            });
+
+            reviewRows.forEach(function (row) {
+                row.dataset.rowType = getRowType(row.dataset.rowNumber || "");
+            });
+
+            const groupedRows = {};
+            rowTypeOrder.forEach(function (rowType) {
+                groupedRows[rowType] = [];
+            });
+
+            reviewRows.forEach(function (row) {
+                const rowType = row.dataset.rowType || "skipped";
+                groupedRows[rowType].push(row);
+            });
+
+            const groupToggle = document.getElementById("group_rows_by_type");
+            const groupEnabled = groupToggle instanceof HTMLInputElement ? groupToggle.checked : false;
+            const fragment = document.createDocumentFragment();
+
+            if (!groupEnabled) {
+                reviewRows
+                    .slice()
+                    .sort(function (left, right) {
+                        return getRowNumberValue(left) - getRowNumberValue(right);
+                    })
+                    .forEach(function (row) {
+                        const rowType = row.dataset.rowType || "skipped";
+                        row.hidden = !(activeRowFilter === "all" || rowType === activeRowFilter);
+                        fragment.appendChild(row);
+                    });
+                reviewTableBody.appendChild(fragment);
+                return;
+            }
+
+            rowTypeOrder.forEach(function (rowType) {
+                const sectionRows = groupedRows[rowType]
+                    .slice()
+                    .sort(function (left, right) {
+                        return getRowNumberValue(left) - getRowNumberValue(right);
+                    });
+                const matchingRows = sectionRows.filter(function (row) {
+                    return activeRowFilter === "all" || rowType === activeRowFilter;
+                });
+                if (!matchingRows.length) {
+                    return;
+                }
+
+                fragment.appendChild(buildSectionRow(rowType, matchingRows.length));
+                sectionRows.forEach(function (row) {
+                    row.hidden = collapsedRowGroups[rowType] || !(activeRowFilter === "all" || rowType === activeRowFilter);
+                    fragment.appendChild(row);
+                });
+            });
+
+            reviewTableBody.appendChild(fragment);
+        }
+
+        function updateFilterButtonState() {
+            document.querySelectorAll("[data-row-filter]").forEach(function (button) {
+                button.classList.toggle("is-active", button.dataset.rowFilter === activeRowFilter);
+            });
         }
 
         function getDisplayFieldStatus(field, mode, expenseAction) {
@@ -1204,6 +1594,8 @@
                 return;
             }
 
+            ensureSuggestedRestaurantSelection(rowNumber);
+
             const restaurantAction = elements.restaurantAction.value;
             const restaurantResolved =
                 restaurantAction === "match" &&
@@ -1352,6 +1744,34 @@
             if (elements.tagPreview) {
                 elements.tagPreview.innerHTML = comparison ? buildTagPreview(comparison, expenseAction) : "";
             }
+
+            renderApplySummary();
+            updateRowVisibilityAndGrouping();
+        }
+
+        function renderApplySummary() {
+            const counts = {
+                total: 0,
+                skipped: 0,
+                blocked: 0,
+                create: 0,
+                update: 0,
+            };
+
+            document.querySelectorAll("tr[data-row-number]").forEach(function (row) {
+                counts.total += 1;
+                const rowType = getRowType(row.dataset.rowNumber || "");
+                counts[rowType] += 1;
+            });
+
+            document.querySelectorAll("[data-import-review-summary]").forEach(function (node) {
+                node.innerHTML = buildRowCategoryBadges(counts, false);
+            });
+
+            document.querySelectorAll("[data-import-review-type-counts]").forEach(function (node) {
+                node.innerHTML = buildRowCategoryBadges(counts, true);
+            });
+
         }
 
         document
@@ -1367,6 +1787,46 @@
                     }
                 );
             });
+
+        document.querySelectorAll("[data-row-filter]").forEach(function (button) {
+            button.addEventListener("click", function () {
+                activeRowFilter = button.dataset.rowFilter || "all";
+                updateFilterButtonState();
+                updateRowVisibilityAndGrouping();
+            });
+        });
+
+        document.addEventListener("click", function (event) {
+            const target = event.target instanceof Element ? event.target.closest("[data-jump-to-section]") : null;
+            if (!(target instanceof HTMLElement)) {
+                return;
+            }
+            const rowType = target.dataset.jumpToSection || "";
+            if (rowType) {
+                navigateToSection(rowType);
+            }
+        });
+
+        const groupToggle = document.getElementById("group_rows_by_type");
+        if (groupToggle instanceof HTMLInputElement) {
+            groupToggle.addEventListener("change", function () {
+                updateRowVisibilityAndGrouping();
+            });
+        }
+
+        const expandAllButton = document.getElementById("expand_all_groups");
+        if (expandAllButton instanceof HTMLButtonElement) {
+            expandAllButton.addEventListener("click", function () {
+                setAllGroupStates(false);
+            });
+        }
+
+        const collapseAllButton = document.getElementById("collapse_all_groups");
+        if (collapseAllButton instanceof HTMLButtonElement) {
+            collapseAllButton.addEventListener("click", function () {
+                setAllGroupStates(true);
+            });
+        }
 
         const reviewForm = document.querySelector('form[action="{{ url_for("expenses.import_expenses") }}"]');
         if (reviewForm instanceof HTMLFormElement) {
@@ -1397,6 +1857,8 @@
         document.querySelectorAll("tr[data-row-number]").forEach(function (row) {
             renderActionState(row.dataset.rowNumber);
         });
+        updateFilterButtonState();
+        updateRowVisibilityAndGrouping();
     });
 </script>
 {% endblock extra_js %}

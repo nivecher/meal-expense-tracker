@@ -3296,13 +3296,31 @@ def _score_import_restaurant_match(payee_name: str, restaurant: Restaurant) -> i
 
 def _is_exact_import_display_name_match(payee_name: str, restaurant: Restaurant) -> bool:
     """Return True when the imported payee exactly matches the restaurant display name."""
-    return payee_name.strip() == (restaurant.display_name or "").strip()
+    normalized_payee = _normalize_import_match_text(payee_name)
+    normalized_display_name = _normalize_import_match_text(restaurant.display_name or "")
+    return bool(normalized_payee and normalized_payee == normalized_display_name)
+
+
+def _is_exact_import_address_match(imported_address: str, restaurant: Restaurant) -> bool:
+    """Return True when the imported address exactly matches the restaurant address."""
+    normalized_imported_address = _normalize_import_match_text(imported_address)
+    restaurant_address_variants = {
+        _normalize_import_match_text(restaurant.address or ""),
+        _normalize_import_match_text(restaurant.full_address or ""),
+    }
+    return bool(
+        normalized_imported_address
+        and normalized_imported_address in {variant for variant in restaurant_address_variants if variant}
+    )
 
 
 def _serialize_restaurant_for_import_review(
     restaurant: Restaurant,
     score: int,
     match_basis: str,
+    *,
+    exact_display_name_match: bool = False,
+    exact_address_match: bool = False,
 ) -> dict[str, Any]:
     """Serialize restaurant summary for import review UI."""
     return {
@@ -3316,6 +3334,8 @@ def _serialize_restaurant_for_import_review(
         "detail_url": url_for("restaurants.restaurant_details", restaurant_id=restaurant.id, _external=True),
         "match_score": score,
         "match_basis": match_basis,
+        "exact_display_name_match": exact_display_name_match,
+        "exact_address_match": exact_address_match,
     }
 
 
@@ -3617,7 +3637,8 @@ def _find_restaurant_candidates_for_import_review(
     if not normalized_address:
         scored_matches: list[tuple[int, str, Restaurant]] = []
         for restaurant in restaurants:
-            if _is_exact_import_display_name_match(payee_name, restaurant):
+            exact_display_name_match = _is_exact_import_display_name_match(payee_name, restaurant)
+            if exact_display_name_match:
                 scored_matches.append((130, "exact display name", restaurant))
                 continue
 
@@ -3634,31 +3655,54 @@ def _find_restaurant_candidates_for_import_review(
 
         scored_matches.sort(key=lambda item: (-item[0], item[2].display_name.lower(), item[2].id))
         return [
-            _serialize_restaurant_for_import_review(restaurant, score, match_basis)
+            _serialize_restaurant_for_import_review(
+                restaurant,
+                score,
+                match_basis,
+                exact_display_name_match=match_basis == "exact display name",
+            )
             for score, match_basis, restaurant in scored_matches[:limit]
         ]
 
     scored_matches: list[tuple[int, str, Restaurant]] = []
     for restaurant in restaurants:
+        exact_display_name_match = _is_exact_import_display_name_match(payee_name, restaurant)
+        exact_address_match = _is_exact_import_address_match(restaurant_address, restaurant)
         score = _score_import_restaurant_match(payee_name, restaurant)
         match_basis = "name"
 
-        if normalized_address:
-            restaurant_address_text = _normalize_import_match_text(restaurant.address or restaurant.full_address or "")
-            if restaurant_address_text and normalized_address == restaurant_address_text:
-                score = max(score, 120)
-                match_basis = "address"
-            elif restaurant_address_text and (
-                normalized_address in restaurant_address_text or restaurant_address_text in normalized_address
-            ):
-                score = max(score, 95)
-                match_basis = "address"
+        restaurant_address_variants = [
+            _normalize_import_match_text(restaurant.address or ""),
+            _normalize_import_match_text(restaurant.full_address or ""),
+        ]
+        if exact_display_name_match and exact_address_match:
+            score = max(score, 160)
+            match_basis = "exact display name + address"
+        elif exact_display_name_match:
+            score = max(score, 130)
+            match_basis = "exact display name"
+        elif exact_address_match:
+            score = max(score, 120)
+            match_basis = "exact address"
+        elif any(
+            restaurant_address_text
+            and (normalized_address in restaurant_address_text or restaurant_address_text in normalized_address)
+            for restaurant_address_text in restaurant_address_variants
+        ):
+            score = max(score, 95)
+            match_basis = "address"
         if score > 0:
             scored_matches.append((score, match_basis, restaurant))
 
     scored_matches.sort(key=lambda item: (-item[0], item[2].display_name.lower(), item[2].id))
     return [
-        _serialize_restaurant_for_import_review(restaurant, score, match_basis)
+        _serialize_restaurant_for_import_review(
+            restaurant,
+            score,
+            match_basis,
+            exact_display_name_match=_is_exact_import_display_name_match(payee_name, restaurant),
+            exact_address_match=_is_exact_import_address_match(restaurant_address, restaurant),
+        )
         for score, match_basis, restaurant in scored_matches[:limit]
     ]
 
@@ -3884,8 +3928,16 @@ def build_expense_import_review(file: FileStorage, user_id: int) -> tuple[bool, 
             if payee_name
             else []
         )
-        requires_restaurant_confirmation = len(restaurant_candidates) > 1
-        suggested_restaurant_id = restaurant_candidates[0]["id"] if len(restaurant_candidates) == 1 else None
+        exact_display_name_candidates = [
+            candidate for candidate in restaurant_candidates if candidate.get("exact_display_name_match")
+        ]
+        if len(exact_display_name_candidates) == 1:
+            suggested_restaurant_id = exact_display_name_candidates[0]["id"]
+        elif len(restaurant_candidates) == 1:
+            suggested_restaurant_id = restaurant_candidates[0]["id"]
+        else:
+            suggested_restaurant_id = None
+        requires_restaurant_confirmation = len(restaurant_candidates) > 1 and suggested_restaurant_id is None
 
         duplicate_match_date = parsed_visit_date if import_source_type == "standard" else parsed_cleared_date
         normalized_tag_names = _normalize_import_tag_names(tag_names or [])

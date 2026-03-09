@@ -444,8 +444,10 @@ class TestExpenseServices:
                 f"Expense #{existing_expense.id}: Cleared date 2026-03-06 is 5 days after visit date 2026-03-01."
             ]
 
-    def test_build_expense_import_review_ignores_blank_rows_and_matches_by_address(self, app, user) -> None:
-        """Test that blank rows are ignored and restaurant suggestions can match by address."""
+    def test_build_expense_import_review_ignores_blank_rows_and_auto_matches_single_address_only_match(
+        self, app, user
+    ) -> None:
+        """Test that a single suggested address-only match is auto-selected."""
         user_obj, user_id = user
 
         with app.app_context():
@@ -474,11 +476,52 @@ class TestExpenseServices:
             assert result["total_rows"] == 1
             row = result["review_rows"][0]
             assert row["restaurant_candidates"][0]["display_name"] == "The Atrium Cafe"
-            assert row["restaurant_candidates"][0]["match_basis"] == "address"
+            assert row["restaurant_candidates"][0]["match_basis"] == "exact address"
+            assert row["suggested_restaurant_id"] == restaurant.id
+            assert row["restaurant_requires_confirmation"] is False
             assert row["default_decision"] == "match"
 
-    def test_build_expense_import_review_prefers_exact_display_name_without_address(self, app, user) -> None:
-        """Test that no-address matching still prefers an exact display name match."""
+    def test_build_expense_import_review_auto_matches_exact_display_name_and_address(self, app, user) -> None:
+        """Test that an exact display-name and address match is auto-selected."""
+        user_obj, user_id = user
+
+        with app.app_context():
+            restaurant = Restaurant(
+                name="The Atrium Cafe",
+                location_name="Downtown",
+                address_line_1="123 Main St",
+                city="Wylie",
+                state="TX",
+                postal_code="75098",
+                user_id=user_id,
+            )
+            db.session.add(restaurant)
+            db.session.commit()
+
+            csv_data = "Date,Payee,Address,Category,Amount\n"
+            csv_data += (
+                "5-Mar-26,The Atrium Cafe - Downtown,123 Main St Wylie TX 75098,Dining & Drinks:Restaurants,-17.59\n"
+            )
+
+            csv_file = Mock()
+            csv_file.read.return_value = csv_data.encode("utf-8")
+            csv_file.seek.return_value = None
+            csv_file.filename = "simplifi-display-address.csv"
+
+            success, result = build_expense_import_review(csv_file, user_id)
+
+            assert success is True
+            row = result["review_rows"][0]
+            assert row["restaurant_candidates"][0]["display_name"] == "The Atrium Cafe - Downtown"
+            assert row["restaurant_candidates"][0]["match_basis"] == "exact display name + address"
+            assert row["suggested_restaurant_id"] == restaurant.id
+            assert row["restaurant_requires_confirmation"] is False
+            assert row["default_decision"] == "match"
+
+    def test_build_expense_import_review_picks_unique_exact_display_name_match_over_partial_match(
+        self, app, user
+    ) -> None:
+        """Test that a unique exact display-name match is auto-selected over looser matches."""
         user_obj, user_id = user
 
         with app.app_context():
@@ -502,9 +545,14 @@ class TestExpenseServices:
             row = result["review_rows"][0]
             assert row["restaurant_candidates"][0]["display_name"] == "Wingstop - Wylie"
             assert row["restaurant_candidates"][0]["match_basis"] == "exact display name"
+            assert len(row["restaurant_candidates"]) == 2
+            assert row["suggested_restaurant_id"] == exact_restaurant.id
+            assert row["restaurant_requires_confirmation"] is False
 
-    def test_build_expense_import_review_allows_partial_name_match_without_address(self, app, user) -> None:
-        """Test that no-address rows can suggest partial restaurant name matches."""
+    def test_build_expense_import_review_auto_matches_single_partial_name_match_without_address(
+        self, app, user
+    ) -> None:
+        """Test that a single suggested partial-name match is auto-selected."""
         user_obj, user_id = user
 
         with app.app_context():
@@ -527,6 +575,7 @@ class TestExpenseServices:
             assert row["restaurant_candidates"][0]["display_name"] == "Woodbridge Golf Club"
             assert row["restaurant_candidates"][0]["match_basis"] in {"partial name", "shared prefix"}
             assert row["suggested_restaurant_id"] == restaurant.id
+            assert row["restaurant_requires_confirmation"] is False
             assert row["expense_default_action"] == "create"
 
     def test_build_expense_import_review_requires_confirmation_for_multiple_restaurant_matches(self, app, user) -> None:
