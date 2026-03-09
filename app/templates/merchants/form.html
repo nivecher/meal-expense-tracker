@@ -1,5 +1,7 @@
 {% extends "base.html" %} {% block title %}{% if merchant %}Edit{% else %}New{% endif %} Merchant - Meal Expense
-Tracker{% endblock %} {% block content %}
+Tracker{% endblock %} {% block styles %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/pages/merchant-form.css') }}" />
+{% endblock styles %} {% block content %}
 <div class="row justify-content-center">
     <div class="col-md-6">
         <div class="card">
@@ -23,7 +25,7 @@ Tracker{% endblock %} {% block content %}
                             class="form-control"
                             id="name"
                             name="name"
-                            value="{{ (merchant.name if merchant else '') or '' }}"
+                            value="{{ (merchant.name if merchant else prefill.name) or '' }}"
                             required
                             placeholder="e.g., Starbucks, McDonald's" />
                     </div>
@@ -35,45 +37,177 @@ Tracker{% endblock %} {% block content %}
                             class="form-control"
                             id="short_name"
                             name="short_name"
-                            value="{{ (merchant.short_name if merchant else '') or '' }}"
+                            value="{{ (merchant.short_name if merchant else prefill.short_name) or '' }}"
                             placeholder="e.g., Starbucks, McD's" />
                         <small class="text-muted">Used in restaurant display names</small>
                     </div>
 
                     <div class="mb-3">
-                        <label for="website" class="form-label">Website</label>
-                        <input
-                            type="url"
+                        <label for="description" class="form-label">Description</label>
+                        <textarea
                             class="form-control"
-                            id="website"
-                            name="website"
-                            value="{{ (merchant.website if merchant else '') or '' }}"
-                            placeholder="https://example.com" />
+                            id="description"
+                            name="description"
+                            rows="3"
+                            placeholder="Short brand summary or notes">{{ (merchant.description if merchant else prefill.description) or '' }}</textarea>
                     </div>
 
                     <div class="mb-3">
-                        <label for="category" class="form-label">Category</label>
-                        <select class="form-select" id="category" name="category">
-                            <option value="">-- Select Category --</option>
-                            {% for cat in categories %}
-                            <option
-                                value="{{ cat }}"
-                                {%
-                                if
-                                merchant
-                                and
-                                merchant.category
-                                and
-                                (merchant.category
-                                in
-                                [cat])
-                                %}selected{%
-                                endif
-                                %}>
-                                {{ cat|replace('_', ' ')|title }}
+                        <label for="website" class="form-label">Website</label>
+                        <div class="input-group">
+                            <input
+                                type="url"
+                                class="form-control"
+                                id="website"
+                                name="website"
+                                value="{{ (merchant.website if merchant else prefill.website) or '' }}"
+                                placeholder="https://example.com" />
+                            <button
+                                type="button"
+                                class="btn btn-outline-secondary"
+                                id="open-website-btn"
+                                data-action="open-website"
+                                data-website="{{ (merchant.website if merchant else prefill.website) or '' }}"
+                                title="Open website in new tab"
+                                aria-label="Open merchant website"
+                                disabled>
+                                <i class="fas fa-external-link-alt"></i>
+                            </button>
+                        </div>
+                        {% if not merchant and prefill.website %}
+                        <small class="text-muted">Prefilled from the restaurant website/domain.</small>
+                        {% endif %}
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="favicon_url" class="form-label">Favicon URL</label>
+                        <input
+                            type="url"
+                            class="form-control"
+                            id="favicon_url"
+                            name="favicon_url"
+                            value="{{ (merchant.favicon_url if merchant else prefill.favicon_url) or '' }}"
+                            placeholder="https://example.com/favicon.ico" />
+                        <small class="text-muted"
+                            >Optional. Overrides website-derived favicon (e.g. for brand icons).</small
+                        >
+                    </div>
+
+                    <div class="mb-3 card bg-light">
+                        <div class="card-body py-3">
+                            <h6 class="card-title mb-2"> <i class="fas fa-image me-1"></i> Favicon preview </h6>
+                            <p class="small text-muted mb-2">
+                                Preview favicons from the website using different sources. Pick one to set as Favicon
+                                URL.
+                            </p>
+                            <div class="d-flex align-items-center gap-2 mb-2">
+                                <button type="button" class="btn btn-sm btn-outline-secondary" id="favicon-preview-btn">
+                                    Load favicon previews
+                                </button>
+                                <span id="favicon-preview-loading" class="d-none small text-muted">Loading…</span>
+                            </div>
+                            <div id="favicon-preview-results" class="favicon-preview-results"></div>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="service_level" class="form-label">Service Level</label>
+                        {% set selected_service_level = merchant.service_level if merchant else prefill.service_level %}
+                        <select class="form-select" id="service_level" name="service_level">
+                            <option value="">-- Select Service Level --</option>
+                            {% for level in service_levels %}
+                            <option value="{{ level }}" {% if selected_service_level == level %}selected{% endif %}>
+                                {{ level.replace('_', ' ')|title }}
                             </option>
                             {% endfor %}
                         </select>
+                    </div>
+
+                    <div class="mb-3">
+                        {% set selected_is_chain = merchant.is_chain if merchant else prefill.is_chain %}
+                        <div class="form-check form-switch">
+                            <input
+                                class="form-check-input"
+                                type="checkbox"
+                                role="switch"
+                                id="is_chain"
+                                name="is_chain"
+                                {% if selected_is_chain in [true, 'true', 'True', 1, '1', 'on', 'yes'] %}checked{% endif %} />
+                            <label for="is_chain" class="form-check-label">Chain Brand</label>
+                        </div>
+                        <small class="text-muted">Use this on the merchant brand, not individual restaurant locations.</small>
+                        {% set linked_restaurant_count = merchant_summary.restaurant_count if merchant_summary is defined and merchant_summary else 0 %}
+                        {% if merchant and not merchant.is_chain and linked_restaurant_count > 1 %}
+                        <div class="form-text text-warning">
+                            Suggested: mark as chain because {{ linked_restaurant_count }} restaurant locations are linked.
+                        </div>
+                        {% endif %}
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="cuisine" class="form-label">Cuisine</label>
+                        {% set selected_cuisine = merchant.cuisine if merchant else prefill.cuisine %}
+                        <select class="form-select" id="cuisine" name="cuisine">
+                            <option value="">-- Select Cuisine --</option>
+                            {% for cuisine in cuisine_choices %}
+                            <option value="{{ cuisine }}" {% if selected_cuisine == cuisine %}selected{% endif %}>
+                                {{ cuisine }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="menu_focus" class="form-label">Menu Focus</label>
+                        <input
+                            type="text"
+                            class="form-control"
+                            id="menu_focus"
+                            name="menu_focus"
+                            value="{{ (merchant.menu_focus if merchant else prefill.menu_focus) or '' }}"
+                            placeholder="e.g., Burgers, Pizza / Grill, Coffee / Donuts" />
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="category" class="form-label">Format Category</label>
+                        {% set selected_category = merchant.category if merchant else prefill.category %}
+                        <select class="form-select" id="category" name="category">
+                            <option value="">-- Select Format Category --</option>
+                            {% for group in format_category_groups %}
+                            <optgroup label="{{ group.label }}">
+                                {% for option in group.options %}
+                                <option value="{{ option.value }}" {% if selected_category == option.value %}selected{% endif %}>
+                                    {{ option.label }}
+                                </option>
+                                {% endfor %}
+                            </optgroup>
+                            {% endfor %}
+                            <option value="other" {% if selected_category == 'other' %}selected{% endif %}>Other</option>
+                        </select>
+                        <small class="text-muted d-block mt-1">
+                            Format describes the physical or operating footprint, not cuisine or service style. See
+                            Help for definitions.
+                        </small>
+                    </div>
+
+                    <div class="mb-3">
+                        <div class="d-flex justify-content-between align-items-center gap-2">
+                            <label for="rewards_program_id" class="form-label mb-0">Rewards Program</label>
+                            <a
+                                href="{{ url_for('loyalty.new_rewards_program', merchant_id=merchant.id if merchant else '', website=merchant.website if merchant and merchant.website else prefill.website if prefill is defined and prefill.website else '') }}"
+                                class="btn btn-sm btn-outline-secondary">
+                                <i class="fas fa-award me-1"></i>Add Rewards Program
+                            </a>
+                        </div>
+                        <select class="form-select mt-2" id="rewards_program_id" name="rewards_program_id">
+                            <option value="">-- No Rewards Program --</option>
+                            {% for rewards_program_id, rewards_program_name in rewards_program_choices %}
+                            <option value="{{ rewards_program_id }}" {% if selected_rewards_program_id|string == rewards_program_id|string %}selected{% endif %}>
+                                {{ rewards_program_name }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                        <small class="text-muted">Advanced feature. Links this merchant to one rewards program for your account.</small>
                     </div>
 
                     <div class="d-flex justify-content-between">
@@ -86,6 +220,48 @@ Tracker{% endblock %} {% block content %}
                 </form>
             </div>
         </div>
+
+        {% if merchant and restaurants is defined and restaurants %}
+        <div class="card mt-4">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="fas fa-utensils me-2"></i>
+                    Linked Restaurants
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="list-group list-group-flush">
+                    {% for restaurant_entry in restaurants %}
+                    {% set restaurant = restaurant_entry.restaurant if restaurant_entry.restaurant is defined else restaurant_entry %}
+                    <a
+                        href="{{ url_for('restaurants.restaurant_details', restaurant_id=restaurant.id) }}"
+                        class="list-group-item list-group-item-action px-0">
+                        <div class="d-flex justify-content-between align-items-start gap-3">
+                            <div>
+                                <div class="fw-semibold">{{ restaurant.display_name }}</div>
+                                <small class="text-muted">
+                                    {{ restaurant|restaurant_address_only|replace('\n', ', ') }}
+                                </small>
+                            </div>
+                            <div class="text-end small text-muted">
+                                {% set expense_count = restaurant_entry.expense_count|default(0) %}
+                                {% set total_amount = restaurant_entry.total_amount|default(0) %}
+                                {% set last_expense_date = restaurant_entry.last_expense_date|default(none) %}
+                                <div>{{ expense_count }} expense{{ 's' if expense_count != 1 else '' }}</div>
+                                <div class="fw-semibold text-success">{{ total_amount|format_currency_usd }}</div>
+                                {% if last_expense_date %}
+                                <div>Last: {{ last_expense_date|time_ago }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </a>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+        {% endif %}
     </div>
 </div>
-{% endblock content %}
+{% endblock content %} {% block scripts %}
+<script type="module" src="{{ url_for('static', filename='js/pages/merchant-form-favicon-preview.js') }}"></script>
+{% endblock scripts %}

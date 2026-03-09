@@ -1,7 +1,16 @@
 from flask.testing import FlaskClient
 
 from app.auth.models import User
+from app.extensions import db
+from app.merchants.models import Merchant
+from app.restaurants.models import Restaurant
 from tests.conftest import AuthActions
+
+
+def _enable_advanced_features(user: User) -> None:
+    user.advanced_features_enabled = True
+    db.session.add(user)
+    db.session.commit()
 
 
 def test_index(client: FlaskClient) -> None:
@@ -143,3 +152,46 @@ def test_index_search(client: FlaskClient, auth: AuthActions, test_user: User) -
     assert response.status_code == 200
     # Check for restaurant data or dashboard content
     assert b"Test Restaurant" in response.data or b"Dashboard" in response.data
+
+
+def test_index_shows_merchant_summary_for_advanced_users(
+    client: FlaskClient, auth: AuthActions, test_user: User
+) -> None:
+    """Dashboard should show merchant summary cards for advanced users."""
+    _enable_advanced_features(test_user)
+
+    merchant = Merchant(name="Acme Coffee", short_name="Acme", category="cafe_bakery", is_chain=True)
+    db.session.add(merchant)
+    db.session.commit()
+
+    restaurant = Restaurant(
+        name="Acme Coffee - Downtown",
+        city="Dallas",
+        user_id=test_user.id,
+        merchant_id=merchant.id,
+        type="restaurant",
+    )
+    db.session.add(restaurant)
+    db.session.commit()
+
+    auth.login("testuser_1", "testpass")
+    response = client.get("/", follow_redirects=True)
+
+    assert response.status_code == 200
+    assert b"Merchant Summary" in response.data
+    assert b"View Merchants" in response.data
+    assert b"Chain Brands" in response.data
+    assert b"Linked Restaurants" in response.data
+
+
+def test_index_hides_merchant_summary_for_standard_users(
+    client: FlaskClient, auth: AuthActions, test_user: User
+) -> None:
+    """Dashboard should not show merchant summary cards for standard users."""
+    auth.login("testuser_1", "testpass")
+
+    response = client.get("/", follow_redirects=True)
+
+    assert response.status_code == 200
+    assert b"Merchant Summary" not in response.data
+    assert b"View Merchants" not in response.data

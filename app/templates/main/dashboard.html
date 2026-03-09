@@ -143,6 +143,68 @@ block head_extra %}
         </div>
     </section>
 
+    {% if merchant_dashboard_stats %}
+    <section class="stats-section mb-3">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h6 class="card-title mb-0"> <i class="fas fa-building me-2 text-primary"></i>Merchant Summary </h6>
+                <a href="{{ url_for('merchants.list_merchants') }}" class="btn btn-sm btn-outline-primary">View Merchants</a>
+            </div>
+            <div class="card-body p-3">
+                <div class="row g-4">
+                    <div class="col-6 col-md-3">
+                        <div class="stats-card h-100">
+                            <div class="stats-icon">
+                                <i class="fas fa-building text-primary"></i>
+                            </div>
+                            <div class="stats-content">
+                                <div class="stats-value">{{ merchant_dashboard_stats.total_merchants or 0 }}</div>
+                                <div class="stats-label">Merchants</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="col-6 col-md-3">
+                        <div class="stats-card h-100">
+                            <div class="stats-icon">
+                                <i class="fas fa-link text-warning"></i>
+                            </div>
+                            <div class="stats-content">
+                                <div class="stats-value">{{ merchant_dashboard_stats.chain_merchants or 0 }}</div>
+                                <div class="stats-label">Chain Brands</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="col-6 col-md-3">
+                        <div class="stats-card h-100">
+                            <div class="stats-icon">
+                                <i class="fas fa-store text-info"></i>
+                            </div>
+                            <div class="stats-content">
+                                <div class="stats-value">{{ merchant_dashboard_stats.linked_restaurants or 0 }}</div>
+                                <div class="stats-label">Linked Restaurants</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="col-6 col-md-3">
+                        <div class="stats-card h-100">
+                            <div class="stats-icon">
+                                <i class="fas fa-dollar-sign text-success"></i>
+                            </div>
+                            <div class="stats-content">
+                                <div class="stats-value">{{ (merchant_dashboard_stats.merchant_spend or 0)|format_currency_usd }}</div>
+                                <div class="stats-label">Merchant Spend</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+    {% endif %}
+
     <!-- Main Content Grid -->
     <div class="row g-4 mb-3">
         <!-- Recent Expenses -->

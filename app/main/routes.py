@@ -68,8 +68,9 @@ def serve_uploaded_file(filename: str) -> Response:
     Returns:
         The requested file or 404 if not found
     """
-    # Verify the user owns an expense with this receipt
+    # Verify the user owns an expense or receipt row with this file reference
     from app.expenses.models import Expense
+    from app.receipts.models import Receipt
 
     # Check both old format (uploads/filename) and new format (filename)
     expense = Expense.query.filter(
@@ -77,7 +78,12 @@ def serve_uploaded_file(filename: str) -> Response:
         Expense.user_id == current_user.id,
     ).first()
 
-    if not expense:
+    receipt = Receipt.query.filter(
+        (Receipt.file_uri == f"uploads/{filename}") | (Receipt.file_uri == filename),
+        Receipt.user_id == current_user.id,
+    ).first()
+
+    if not expense and not receipt:
         abort(404)
 
     upload_folder = current_app.config.get("UPLOAD_FOLDER")
@@ -164,6 +170,7 @@ def help_page() -> str:
     from app.constants import MEAL_TYPES
     from app.constants.categories import get_default_categories
     from app.constants.cuisines import get_cuisine_color, get_cuisine_constants
+    from app.merchants.services import get_merchant_format_category_groups
 
     # Get cuisine constants but override colors with centralized Bootstrap colors
     cuisines = get_cuisine_constants()
@@ -175,6 +182,7 @@ def help_page() -> str:
         meal_types=list(MEAL_TYPES.values()),
         cuisines=cuisines,
         categories=get_default_categories(),
+        merchant_format_category_groups=get_merchant_format_category_groups(),
     )
 
 
@@ -229,6 +237,7 @@ def test() -> str:
 def index() -> str:
     """Display the main dashboard with welcome message, stats, and recent activity."""
     user_id = current_user.id
+    merchant_dashboard_stats = None
 
     # Get expense statistics
     expense_stats = db.session.execute(
@@ -270,12 +279,24 @@ def index() -> str:
         .limit(5)
     ).all()
 
+    if current_user.has_advanced_features or current_user.is_admin:
+        from app.merchants import services as merchant_services
+
+        merchants, merchant_data = merchant_services.get_merchants_with_detailed_stats(user_id, {})
+        merchant_dashboard_stats = {
+            "total_merchants": merchant_data.get("stats", {}).get("total_merchants", 0),
+            "chain_merchants": sum(1 for merchant in merchants if merchant.is_chain),
+            "linked_restaurants": merchant_data.get("stats", {}).get("total_restaurants", 0),
+            "merchant_spend": merchant_data.get("stats", {}).get("total_amount", 0.0),
+        }
+
     return render_template(
         "main/dashboard.html",
         expense_stats=expense_stats,
         restaurant_stats=restaurant_stats,
         recent_expenses=recent_expenses,
         top_restaurants=top_restaurants,
+        merchant_dashboard_stats=merchant_dashboard_stats,
     )
 
 
