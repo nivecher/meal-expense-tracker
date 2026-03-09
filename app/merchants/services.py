@@ -7,6 +7,7 @@ import re
 from typing import Any
 
 from sqlalchemy import distinct, func, or_, select
+from sqlalchemy.sql.elements import ColumnElement
 from werkzeug.datastructures import FileStorage
 
 from app.constants.cuisines import get_cuisine_names
@@ -583,8 +584,8 @@ def get_merchants_with_detailed_stats(
     filters = filters or {}
 
     if user_id is not None:
-        join_restaurant = (Merchant.id == Restaurant.merchant_id) & (Restaurant.user_id == user_id)
-        join_expense = (Restaurant.id == Expense.restaurant_id) & (Expense.user_id == user_id)
+        join_restaurant: ColumnElement[bool] = (Merchant.id == Restaurant.merchant_id) & (Restaurant.user_id == user_id)
+        join_expense: ColumnElement[bool] = (Restaurant.id == Expense.restaurant_id) & (Expense.user_id == user_id)
     else:
         join_restaurant = Merchant.id == Restaurant.merchant_id
         join_expense = Restaurant.id == Expense.restaurant_id

@@ -9,7 +9,7 @@ from pathlib import Path
 import tempfile
 
 # Type annotations for responses
-from typing import Any, Optional, Tuple, Union
+from typing import Any, Optional, Tuple, Union, cast
 import uuid
 
 from flask import (
@@ -101,7 +101,7 @@ def _load_import_review_draft() -> dict[str, Any] | None:
         session.pop(IMPORT_REVIEW_SESSION_KEY, None)
         return None
     try:
-        return json.loads(draft_path.read_text(encoding="utf-8"))
+        return cast(dict[str, Any], json.loads(draft_path.read_text(encoding="utf-8")))
     except (OSError, json.JSONDecodeError):
         current_app.logger.error("Failed to load import review draft from %s", draft_path)
         session.pop(IMPORT_REVIEW_SESSION_KEY, None)

@@ -1,7 +1,7 @@
 """Add format_category to merchant.
 
 Revision ID: d4e5f6a7b8c9
-Revises: c1d4a8f9e2b7
+Revises: 2b7d4e1f9c3a
 Create Date: 2026-03-08 11:30:00.000000
 
 """
@@ -11,7 +11,7 @@ import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
 revision = "d4e5f6a7b8c9"
-down_revision = "c1d4a8f9e2b7"
+down_revision = "2b7d4e1f9c3a"
 branch_labels: tuple[str, ...] | None = None
 depends_on: tuple[str, ...] | None = None
 

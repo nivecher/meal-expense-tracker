@@ -8,6 +8,7 @@ from urllib.parse import urlencode
 
 from flask import Response, abort, flash, jsonify, make_response, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
+from werkzeug.wrappers import Response as WerkzeugResponse
 
 from app.api import validate_api_csrf
 from app.constants import get_cuisine_names
@@ -587,7 +588,7 @@ def export_merchants() -> Response:
 
 @bp.route("/import", methods=["GET", "POST"])
 @login_required
-def import_merchants() -> str | Response:
+def import_merchants() -> str | Response | WerkzeugResponse:
     """Handle merchant import from file upload."""
     if not _check_merchant_access():
         flash("Merchants is an advanced feature", "warning")

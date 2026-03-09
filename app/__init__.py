@@ -22,7 +22,7 @@ except PermissionError:
 __all__ = ["create_app"]
 
 
-def create_app(config_name: str | None = None) -> Flask:
+def create_app(config_name: str | type[Config] | None = None) -> Flask:
     """Create and configure the Flask application.
 
     Args:
@@ -31,8 +31,8 @@ def create_app(config_name: str | None = None) -> Flask:
         Flask: The configured Flask application instance.
     """
     # Respect explicit app factory overrides before falling back to FLASK_ENV.
-    if isinstance(config_name, type) and issubclass(config_name, Config):
-        config = config_name()
+    if isinstance(config_name, type):
+        config = config_name() if issubclass(config_name, Config) else get_config()
     elif isinstance(config_name, str) and config_name.strip():
         config = get_config(config_name.strip())
     else:

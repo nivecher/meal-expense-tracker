@@ -19,8 +19,6 @@ from app.utils.phone_utils import normalize_phone_for_storage
 def _loyalty_tables_ready() -> bool:
     """Return whether the loyalty tables exist in the current database."""
     bind = db.session.get_bind()
-    if bind is None:
-        return False
     inspector = inspect(bind)
     required_tables = {"rewards_program", "rewards_account", "merchant_rewards_link"}
     existing_tables = set(inspector.get_table_names())

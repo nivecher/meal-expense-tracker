@@ -848,7 +848,7 @@ def _infer_receipt_type(storage_path: str) -> str:
 
 def _get_receipt_record_for_expense(expense: Expense) -> Receipt | None:
     """Return the canonical receipt row for an expense if one exists."""
-    receipt_obj = getattr(expense, "receipt", None)
+    receipt_obj = expense.receipt
     if receipt_obj is not None:
         return receipt_obj
 
@@ -858,7 +858,7 @@ def _get_receipt_record_for_expense(expense: Expense) -> Receipt | None:
         .where(Receipt.user_id == expense.user_id)
         .order_by(Receipt.id.asc())
     )
-    return db.session.execute(stmt).scalars().first()
+    return db.session.scalars(stmt).first()
 
 
 def _upsert_receipt_record_for_expense(expense: Expense, storage_path: str) -> Receipt:
@@ -925,7 +925,7 @@ def create_expense(
         category_id, restaurant_id, datetime_value, cleared_date, amount, tags = expense_data
 
         # Handle receipt upload if provided
-        receipt_image_path = None
+        receipt_image_path: str | None = None
         if receipt_file and receipt_file.filename:
             try:
                 from flask import current_app
@@ -1147,6 +1147,8 @@ def _upload_new_receipt(expense: Expense, receipt_file: FileStorage) -> str | No
         if error:
             return error
 
+        if storage_path is None:
+            return "Receipt storage path is not set"
         _upsert_receipt_record_for_expense(expense, storage_path)
         current_app.logger.info(f"Receipt updated: {storage_path}")
         return None
@@ -1579,7 +1581,7 @@ def export_expenses_for_user(user_id: int, expense_ids: list[int] | None = None)
             {
                 # Backup-friendly: include both a human-friendly date and full UTC timestamp.
                 "date": date_str,
-                "cleared_date": expense.cleared_date.isoformat() if expense.cleared_date else "",
+                "cleared_date": expense.cleared_date.isoformat() if isinstance(expense.cleared_date, date) else "",
                 "time_utc": time_str,
                 "datetime_utc": datetime_str,
                 "amount": safe_float(expense.amount) if expense.amount is not None else "",
@@ -3354,7 +3356,7 @@ def _serialize_duplicate_expense_for_import_review(expense: Expense) -> dict[str
         "label": f"Expense #{expense.id}",
         "date": expense.date.date().isoformat() if expense.date else "",
         "visit_date": expense.date.date().isoformat() if expense.date else "",
-        "cleared_date": expense.cleared_date.isoformat() if expense.cleared_date else "",
+        "cleared_date": expense.cleared_date.isoformat() if isinstance(expense.cleared_date, date) else "",
         "time_display": expense.date.strftime("%H:%M UTC") if expense.date else "",
         "datetime_display": expense.date.strftime("%Y-%m-%d %H:%M UTC") if expense.date else "",
         "amount": f"{expense.amount:.2f}" if expense.amount is not None else "",
@@ -3539,7 +3541,7 @@ def _build_duplicate_expense_comparison(
         ("Time", current_time_display, imported_time_display),
         (
             "Cleared Date",
-            duplicate_expense.cleared_date.isoformat() if duplicate_expense.cleared_date else "",
+            duplicate_expense.cleared_date.isoformat() if isinstance(duplicate_expense.cleared_date, date) else "",
             imported_cleared_date.isoformat() if imported_cleared_date else "",
         ),
         ("Amount", _format_import_review_value(duplicate_expense.amount), _format_import_review_value(imported_amount)),
@@ -3635,11 +3637,11 @@ def _find_restaurant_candidates_for_import_review(
     normalized_address = _normalize_import_match_text(restaurant_address)
 
     if not normalized_address:
-        scored_matches: list[tuple[int, str, Restaurant]] = []
+        matches_without_address: list[tuple[int, str, Restaurant]] = []
         for restaurant in restaurants:
             exact_display_name_match = _is_exact_import_display_name_match(payee_name, restaurant)
             if exact_display_name_match:
-                scored_matches.append((130, "exact display name", restaurant))
+                matches_without_address.append((130, "exact display name", restaurant))
                 continue
 
             score = _score_import_restaurant_match(payee_name, restaurant)
@@ -3651,9 +3653,9 @@ def _find_restaurant_candidates_for_import_review(
                 match_basis = "exact name"
             elif score >= 84:
                 match_basis = "shared prefix"
-            scored_matches.append((score, match_basis, restaurant))
+            matches_without_address.append((score, match_basis, restaurant))
 
-        scored_matches.sort(key=lambda item: (-item[0], item[2].display_name.lower(), item[2].id))
+        matches_without_address.sort(key=lambda item: (-item[0], item[2].display_name.lower(), item[2].id))
         return [
             _serialize_restaurant_for_import_review(
                 restaurant,
@@ -3661,7 +3663,7 @@ def _find_restaurant_candidates_for_import_review(
                 match_basis,
                 exact_display_name_match=match_basis == "exact display name",
             )
-            for score, match_basis, restaurant in scored_matches[:limit]
+            for score, match_basis, restaurant in matches_without_address[:limit]
         ]
 
     scored_matches: list[tuple[int, str, Restaurant]] = []
@@ -3718,16 +3720,17 @@ def _find_duplicate_candidates_for_import_review(
     start_dt = datetime.combine(expense_date - timedelta(days=window_days), time.min, tzinfo=UTC)
     end_dt = datetime.combine(expense_date + timedelta(days=window_days + 1), time.min, tzinfo=UTC)
 
-    return (
-        Expense.query.options(joinedload(Expense.restaurant), joinedload(Expense.category))
-        .filter(Expense.user_id == user_id)
-        .filter(Expense.restaurant_id == restaurant_id)
-        .filter(Expense.amount == abs(amount))
-        .filter(Expense.date >= start_dt)
-        .filter(Expense.date < end_dt)
+    stmt = (
+        select(Expense)
+        .options(joinedload(Expense.restaurant), joinedload(Expense.category))
+        .where(Expense.user_id == user_id)
+        .where(Expense.restaurant_id == restaurant_id)
+        .where(Expense.amount == abs(amount))
+        .where(Expense.date >= start_dt)
+        .where(Expense.date < end_dt)
         .order_by(Expense.date.desc())
-        .all()
     )
+    return list(db.session.scalars(stmt).all())
 
 
 def _find_duplicate_candidates_for_import_review_any_restaurant(
@@ -3740,15 +3743,16 @@ def _find_duplicate_candidates_for_import_review_any_restaurant(
     start_dt = datetime.combine(expense_date - timedelta(days=window_days), time.min, tzinfo=UTC)
     end_dt = datetime.combine(expense_date + timedelta(days=window_days + 1), time.min, tzinfo=UTC)
 
-    return (
-        Expense.query.options(joinedload(Expense.restaurant), joinedload(Expense.category))
-        .filter(Expense.user_id == user_id)
-        .filter(Expense.amount == abs(amount))
-        .filter(Expense.date >= start_dt)
-        .filter(Expense.date < end_dt)
+    stmt = (
+        select(Expense)
+        .options(joinedload(Expense.restaurant), joinedload(Expense.category))
+        .where(Expense.user_id == user_id)
+        .where(Expense.amount == abs(amount))
+        .where(Expense.date >= start_dt)
+        .where(Expense.date < end_dt)
         .order_by(Expense.date.desc(), Expense.id.desc())
-        .all()
     )
+    return list(db.session.scalars(stmt).all())
 
 
 def _serialize_duplicate_candidates_by_restaurant(
@@ -3992,7 +3996,12 @@ def build_expense_import_review(file: FileStorage, user_id: int) -> tuple[bool, 
                 expense_date=parsed_cleared_date,
                 window_days=14,
             )
-            seen_warning_ids = {int(candidate.get("id")) for candidate in warning_candidates if candidate.get("id")}
+            seen_warning_ids = {
+                candidate_id
+                for candidate in warning_candidates
+                for candidate_id in [candidate.get("id")]
+                if isinstance(candidate_id, int)
+            }
             for candidate in extended_warning_candidates:
                 if candidate.id in seen_warning_ids:
                     continue
@@ -4069,8 +4078,8 @@ def build_expense_import_review(file: FileStorage, user_id: int) -> tuple[bool, 
                     "tags": tags_value,
                 },
                 "parsed_date": (
-                    (parsed_visit_date or parsed_cleared_date).isoformat()
-                    if (parsed_visit_date or parsed_cleared_date)
+                    parsed_primary_date.isoformat()
+                    if (parsed_primary_date := (parsed_visit_date or parsed_cleared_date)) is not None
                     else ""
                 ),
                 "parsed_visit_date": parsed_visit_date.isoformat() if parsed_visit_date else "",

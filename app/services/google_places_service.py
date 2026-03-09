@@ -991,12 +991,15 @@ class GooglePlacesService:
             # Raw place often has no cuisine_type; use same extraction as elsewhere (no extra API call)
             extracted = self.extract_restaurant_data(place)
             cuisine = extracted.get("cuisine_type", "")
-        primary_type = place.get("primaryType") or place.get("primary_type")
+        primary_type_raw = place.get("primaryType") or place.get("primary_type")
+        primary_type = str(primary_type_raw) if primary_type_raw else ""
         cuisine_lower = str(cuisine).lower() if cuisine else ""
         if cuisine_lower and cuisine_lower not in ("american", "unknown"):
             type_label = f"{str(cuisine).title()} restaurant"
         else:
-            type_label = self.format_primary_type_for_display(primary_type) if primary_type else "Restaurant"
+            type_label = (
+                self.format_primary_type_for_display(primary_type) or "Restaurant" if primary_type else "Restaurant"
+            )
         if type_label:
             parts.append(type_label)
 

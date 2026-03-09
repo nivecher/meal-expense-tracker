@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import UTC, datetime, timezone
+from datetime import UTC, date as date_cls, datetime, timezone
 from decimal import ROUND_HALF_UP, Decimal
 from typing import TYPE_CHECKING, Any, Dict, Optional
 
@@ -283,7 +283,7 @@ class Expense(BaseModel):
         default=lambda: datetime.now(UTC),
         comment="Visit date and time when the expense occurred",
     )
-    cleared_date: Mapped[date | None] = mapped_column(
+    cleared_date: Mapped[date_cls | None] = mapped_column(
         db.Date,
         nullable=True,
         index=True,
@@ -364,7 +364,7 @@ class Expense(BaseModel):
     @property
     def receipt_storage_path(self) -> str | None:
         """Return the canonical receipt storage path with legacy fallback."""
-        receipt_obj = getattr(self, "receipt", None)
+        receipt_obj = self.receipt
         if receipt_obj is not None and receipt_obj.file_uri:
             return receipt_obj.file_uri
         return self.receipt_image
@@ -414,7 +414,7 @@ class Expense(BaseModel):
             "order_type": self.order_type,
             "party_size": self.party_size,
             "date": self.date.isoformat() if self.date else None,
-            "cleared_date": self.cleared_date.isoformat() if self.cleared_date else None,
+            "cleared_date": self.cleared_date.isoformat() if isinstance(self.cleared_date, date_cls) else None,
             "formatted_amount": self.formatted_amount,
             "price_per_person": (float(self.price_per_person) if self.price_per_person is not None else None),
             "formatted_price_per_person": self.formatted_price_per_person,

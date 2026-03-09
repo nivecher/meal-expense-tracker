@@ -6,7 +6,7 @@ from datetime import UTC, date, datetime
 from decimal import Decimal
 from typing import Any
 
-from sqlalchemy import or_
+from sqlalchemy import or_, select
 
 from app.auth.models import User
 from app.expenses.models import Category, Expense, ExpenseTag, Tag
@@ -79,16 +79,28 @@ def export_user_backup(
     exported_by: User | None = None,
 ) -> dict[str, Any]:
     """Export a complete backup for a single user and all owned records."""
-    restaurants = user.restaurants.order_by(Restaurant.id.asc()).all()  # type: ignore[call-arg]
+    restaurants = list(
+        db.session.scalars(select(Restaurant).where(Restaurant.user_id == user.id).order_by(Restaurant.id.asc())).all()
+    )
     merchant_ids = sorted({restaurant.merchant_id for restaurant in restaurants if restaurant.merchant_id is not None})
     merchants = (
-        Merchant.query.filter(Merchant.id.in_(merchant_ids)).order_by(Merchant.id.asc()).all() if merchant_ids else []
+        list(
+            db.session.scalars(select(Merchant).where(Merchant.id.in_(merchant_ids)).order_by(Merchant.id.asc())).all()
+        )
+        if merchant_ids
+        else []
     )
-    visits = user.visits.order_by(Visit.id.asc()).all()  # type: ignore[call-arg]
-    categories = user.categories.order_by(Category.id.asc()).all()  # type: ignore[call-arg]
-    tags = user.tags.order_by(Tag.id.asc()).all()  # type: ignore[call-arg]
-    expenses = user.expenses.order_by(Expense.id.asc()).all()  # type: ignore[call-arg]
-    receipts = user.receipts.order_by(Receipt.id.asc()).all()  # type: ignore[call-arg]
+    visits = list(db.session.scalars(select(Visit).where(Visit.user_id == user.id).order_by(Visit.id.asc())).all())
+    categories = list(
+        db.session.scalars(select(Category).where(Category.user_id == user.id).order_by(Category.id.asc())).all()
+    )
+    tags = list(db.session.scalars(select(Tag).where(Tag.user_id == user.id).order_by(Tag.id.asc())).all())
+    expenses = list(
+        db.session.scalars(select(Expense).where(Expense.user_id == user.id).order_by(Expense.id.asc())).all()
+    )
+    receipts = list(
+        db.session.scalars(select(Receipt).where(Receipt.user_id == user.id).order_by(Receipt.id.asc())).all()
+    )
     expense_ids = [expense.id for expense in expenses]
     expense_tags = (
         ExpenseTag.query.filter(ExpenseTag.expense_id.in_(expense_ids)).order_by(ExpenseTag.id.asc()).all()
@@ -144,7 +156,11 @@ def _validate_backup_payload(payload: dict[str, Any]) -> None:
 
 
 def _find_existing_backup_user(username: str, email: str) -> list[User]:
-    return User.query.filter(or_(User.username == username, User.email == email)).order_by(User.id.asc()).all()
+    return list(
+        db.session.scalars(
+            select(User).where(or_(User.username == username, User.email == email)).order_by(User.id.asc())
+        ).all()
+    )
 
 
 def _match_or_create_merchant(merchant_data: dict[str, Any]) -> Merchant:
@@ -323,11 +339,13 @@ def import_user_backup(
     visit_map: dict[int, Visit] = {}
     for visit_data in payload.get("visits", []):
         old_restaurant_id = visit_data.get("restaurant_id")
-        restaurant = restaurant_map.get(int(old_restaurant_id)) if old_restaurant_id is not None else None
-        if restaurant is None:
+        visit_restaurant: Restaurant | None = (
+            restaurant_map.get(int(old_restaurant_id)) if old_restaurant_id is not None else None
+        )
+        if visit_restaurant is None:
             raise ValueError("Backup visit references a missing restaurant")
         visit = Visit(
-            restaurant_id=restaurant.id,
+            restaurant_id=visit_restaurant.id,
             user_id=user.id,
             datetime_start=_parse_datetime(visit_data.get("datetime_start")),
             datetime_end=_parse_datetime(visit_data.get("datetime_end")),

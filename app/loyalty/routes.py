@@ -10,6 +10,7 @@ from typing import Any
 
 from flask import Response, abort, flash, make_response, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
+from werkzeug.wrappers import Response as WerkzeugResponse
 
 from app.loyalty import bp, services as loyalty_services
 from app.loyalty.forms import LoyaltyImportForm
@@ -17,7 +18,7 @@ from app.merchants import services as merchant_services
 from app.utils.phone_utils import normalize_phone_for_storage
 
 
-def _require_loyalty_access() -> Any | None:
+def _require_loyalty_access() -> Response | WerkzeugResponse | None:
     """Require advanced feature access for loyalty pages."""
     if not (current_user.has_advanced_features or current_user.is_admin):
         flash("Loyalty is an advanced feature", "warning")
@@ -238,7 +239,7 @@ def edit_rewards_program(program_id: int) -> Any:
 
 @bp.route("/export")
 @login_required
-def export_rewards_programs() -> Response:
+def export_rewards_programs() -> Response | WerkzeugResponse:
     """Export rewards programs as CSV or JSON."""
     access_response = _require_loyalty_access()
     if access_response is not None:
@@ -292,7 +293,7 @@ def export_rewards_programs() -> Response:
 
 @bp.route("/import", methods=["GET", "POST"])
 @login_required
-def import_rewards_programs() -> Any:
+def import_rewards_programs() -> str | Response | WerkzeugResponse:
     """Import rewards programs from a CSV or JSON upload."""
     access_response = _require_loyalty_access()
     if access_response is not None:

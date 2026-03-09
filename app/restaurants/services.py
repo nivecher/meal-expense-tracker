@@ -4,8 +4,9 @@ import csv
 import io
 from typing import Any, Dict, List, Optional, Tuple
 
-from sqlalchemy import and_, case, func, inspect, not_, or_, select
+from sqlalchemy import and_, case, func, not_, or_, select
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import object_session
 from sqlalchemy.sql import Select
 from werkzeug.datastructures import FileStorage
 
@@ -363,7 +364,7 @@ def get_restaurants_with_stats_paginated(
         linked = int(stats_row.linked_restaurants or 0)
         unlinked = total_count - linked
         missing_location_name_restaurants = int(stats_row.missing_location_name_restaurants or 0)
-        avg_prices = []  # per-restaurant avg; we don't have it in stats_row
+        avg_prices: list[float] = []  # per-restaurant avg; we don't have it in stats_row
         overall_avg = sum(avg_prices) / len(avg_prices) if avg_prices else 0.0
     else:
         total_spent = 0.0
@@ -756,7 +757,7 @@ def create_restaurant(user_id: int, form: Any) -> tuple[Restaurant, bool]:
         db.session.rollback()
         # Rollback resets the failed transaction. Only detach the failed
         # restaurant so unrelated objects like current_user stay session-bound.
-        if inspect(restaurant).session is db.session:
+        if object_session(restaurant) is db.session:
             db.session.expunge(restaurant)
 
         # Handle database constraint violations
@@ -898,7 +899,7 @@ def update_restaurant(restaurant_id: int, user_id: int, form: Any) -> Restaurant
     except IntegrityError as e:
         db.session.rollback()
         # Keep unrelated loaded objects attached to the session.
-        if inspect(restaurant).session is db.session:
+        if object_session(restaurant) is db.session:
             db.session.expunge(restaurant)
 
         # Handle database constraint violations

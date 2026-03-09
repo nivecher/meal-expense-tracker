@@ -324,7 +324,8 @@ def show_merchant(
         }
         if user_id is not None or username is not None:
             users = _get_target_users(user_id, username, False)
-            payload["users"] = []
+            users_payload: list[dict[str, object]] = []
+            payload["users"] = users_payload
             for user in users:
                 restaurants = merchant_services.get_restaurants_for_merchant(user.id, merchant_id)
                 summary = merchant_services.get_merchant_expense_summary(user.id, merchant_id)
@@ -339,7 +340,7 @@ def show_merchant(
                         user.id, merchant_id
                     )
                     block["unlinked"] = [{"id": r.id, "name": r.name or ""} for r in unlinked_rest]
-                payload["users"].append(block)
+                users_payload.append(block)
         else:
             count = len(list(merchant.restaurants))
             payload["total_linked_restaurants"] = count
