@@ -928,7 +928,8 @@ def _check_coordinates_mismatch_api(
         fixes_to_apply["latitude"] = str(google_lat_f)
         fixes_to_apply["longitude"] = str(google_lng_f)
     elif current_has:
-        assert current_lat is not None and current_lng is not None
+        if current_lat is None or current_lng is None:
+            return
         if abs(current_lat - google_lat_f) > tolerance or abs(current_lng - google_lng_f) > tolerance:
             mismatches.append(
                 f"Coordinates: {current_lat:.6f}°, {current_lng:.6f}° vs Google {google_lat_f:.6f}°, {google_lng_f:.6f}°"

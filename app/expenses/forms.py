@@ -110,7 +110,8 @@ class ExpenseForm(FlaskForm):
             current_app.logger.error(f"Error converting amount to Decimal: {e}")
             raise ValidationError("Please enter a valid amount")
 
-    date = DateField("Date", validators=[DataRequired(message="Date is required")], format="%Y-%m-%d")
+    date = DateField("Visit Date", validators=[DataRequired(message="Visit Date is required")], format="%Y-%m-%d")
+    cleared_date = DateField("Cleared Date", validators=[Optional()], format="%Y-%m-%d")
     time = TimeField(
         "Time",
         validators=[Optional()],
@@ -127,7 +128,7 @@ class ExpenseForm(FlaskForm):
     restaurant_id = SelectField(
         "Restaurant",
         coerce=lambda x: int(x) if x not in (None, "") and str(x).isdigit() else None,
-        validators=[Optional()],
+        validators=[DataRequired(message="Restaurant is required")],
         render_kw={"class": "form-select"},
     )
     # Optional Fields

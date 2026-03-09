@@ -4,6 +4,7 @@ import csv
 import io
 import json
 from typing import Any, Optional, Tuple, Union, cast
+from urllib.parse import urlparse
 
 from flask import (
     Response,
@@ -48,6 +49,7 @@ FOOD_BUSINESS_TYPES = [
 ]
 from app.constants.restaurant_types import get_restaurant_type_form_choices_grouped
 from app.merchants import services as merchant_services
+from app.merchants.models import Merchant
 from app.restaurants import bp, services
 from app.restaurants.exceptions import (
     DuplicateGooglePlaceIdError,
@@ -59,11 +61,24 @@ from app.restaurants.services import (
     calculate_expense_stats,
     search_restaurants_by_location,
 )
+from app.utils.address_utils import normalize_state_to_usps
 from app.utils.decorators import admin_required
 
 # Constants
-PER_PAGE = 10  # Number of restaurants per page
-SHOW_ALL = -1  # Special value to show all restaurants
+DEFAULT_LIST_PAGE_SIZE = 25
+MAX_LIST_PAGE_SIZE = 100
+LEGACY_COOKIE_PAGE_SIZES = {-1, 10, 25, 50}
+_ROUTE_RESTAURANT_FORM = RestaurantForm
+
+
+def _get_page_size_from_cookie() -> int:
+    """Return the legacy restaurant page size preference from the request cookie."""
+    raw_value = request.cookies.get("restaurant_page_size")
+    try:
+        page_size = int(raw_value) if raw_value is not None else 10
+    except (TypeError, ValueError):
+        return 10
+    return page_size if page_size in LEGACY_COOKIE_PAGE_SIZES else 10
 
 
 def _populate_merchant_choices(form: RestaurantForm, user_id: int) -> None:
@@ -84,54 +99,76 @@ def _populate_merchant_choices(form: RestaurantForm, user_id: int) -> None:
     form.merchant_id.choices = choices
 
 
+def _is_safe_redirect_path(url: str | None) -> bool:
+    """Return True if url is a safe internal path for redirect."""
+    if not url or not isinstance(url, str):
+        return False
+    url = url.strip()
+    if url.startswith(("http://", "https://", "//")):
+        return False
+    if not url.startswith("/"):
+        return False
+
+    parsed = urlparse(url)
+    return bool(parsed.path and not parsed.netloc)
+
+
+def _get_safe_redirect_path(url: str | None) -> str | None:
+    """Return a sanitized internal redirect path or None."""
+    if not _is_safe_redirect_path(url):
+        return None
+    return str(url).strip()
+
+
+def _get_selected_merchant_for_form(form: RestaurantForm, restaurant: Restaurant | None = None) -> Merchant | None:
+    """Resolve the merchant currently associated with the form."""
+    if restaurant and restaurant.merchant:
+        return restaurant.merchant
+
+    merchant_id = getattr(form.merchant_id, "data", None)
+    if not merchant_id:
+        return None
+
+    return db.session.get(Merchant, merchant_id)
+
+
 def _render_restaurant_list(
     *,
     paginated_restaurants: list,
     stats: dict,
-    page: int,
-    per_page: int,
-    total_pages: int,
     total_restaurants: int,
+    has_more: bool = False,
+    next_offset: int = 0,
     filters: dict,
     filter_options: dict,
     active_tab: str = "restaurants",
     places_mode: str = "my",
+    is_htmx: bool = False,
 ) -> str:
     """Render the restaurant list template with shared context."""
     return render_template(
         "restaurants/list.html",
         restaurants=paginated_restaurants,
+        stats=stats,
         total_spent=stats.get("total_spent", 0),
         avg_price_per_person=stats.get("avg_price_per_person", 0),
-        page=page,
-        per_page=per_page,
-        total_pages=total_pages,
         total_restaurants=total_restaurants,
+        has_more=has_more,
+        next_offset=next_offset,
         search=filters["search"],
         cuisine=filters["cuisine"],
         service_level=filters["service_level"],
         city=filters["city"],
         is_chain=filters["is_chain"],
+        merchant_status=filters["merchant_status"],
+        missing_location_name=filters["missing_location_name"],
         rating_min=filters["rating_min"],
         rating_max=filters["rating_max"],
         active_tab=active_tab,
         places_mode=places_mode,
+        is_htmx=is_htmx,
         **filter_options,
     )
-
-
-def _get_page_size_from_cookie(cookie_name: str = "restaurant_page_size", default_size: int = PER_PAGE) -> int:
-    """Get page size from cookie with validation and fallback."""
-    try:
-        cookie_value = request.cookies.get(cookie_name)
-        if cookie_value:
-            page_size = int(cookie_value)
-            # Validate page size is in allowed values
-            if page_size in [10, 25, 50, 100, SHOW_ALL]:
-                return page_size
-    except (ValueError, TypeError):
-        pass
-    return default_size
 
 
 def _extract_location_from_query(query: str) -> tuple[str, str | None]:
@@ -650,12 +687,12 @@ def _map_place_to_restaurant_data(place: dict[str, Any], place_id: str, places_s
     name, phone, website, state, country, cuisine so CLI validate, UI validate, and
     add-from-search all see the same normalized data.
     """
-    from app.utils.url_utils import strip_url_query_params
+    from app.utils.url_utils import canonicalize_website_for_storage
 
     # Single source of truth: same extraction as CLI and API validate
     google_data = places_service.extract_restaurant_data(place)
 
-    # Form-only: type mapping, description, notes, service_level, is_chain, raw place extras
+    # Form-only: type mapping, description, notes, service_level, raw place extras
     analysis_result = places_service.analyze_restaurant_types(place)
     service_level = analysis_result.get("service_level", "casual_dining")
     mapped_type = _map_google_primary_type_to_form_type(google_data.get("primary_type", ""))
@@ -680,7 +717,7 @@ def _map_place_to_restaurant_data(place: dict[str, Any], place_id: str, places_s
         "country": google_data.get("country", ""),
         "located_within": google_data.get("located_within", ""),
         "phone": google_data.get("phone_number"),
-        "website": strip_url_query_params(google_data.get("website", "") or ""),
+        "website": canonicalize_website_for_storage(google_data.get("website", "") or "") or "",
         "cuisine": google_data.get("cuisine_type", "american"),
         "rating": google_data.get("rating"),
         "formatted_address": google_data.get("formatted_address"),
@@ -697,7 +734,6 @@ def _map_place_to_restaurant_data(place: dict[str, Any], place_id: str, places_s
         "notes": generate_notes(place),
         "email": None,
         "service_level": service_level,
-        "is_chain": places_service.detect_chain_restaurant(google_data.get("name", ""), place),
         "address_components": place.get("addressComponents", []),
         "takeout": place.get("takeout"),
         "delivery": place.get("delivery"),
@@ -835,52 +871,48 @@ def list_restaurants() -> Any:
 
         tab = "restaurants"
 
-    # Get pagination parameters with type hints
-    page = request.args.get("page", 1, type=int)
-    # Check for per_page in URL params first, then cookie, then default
-    per_page = request.args.get("per_page", type=int)
-    save_preference = False
-    if per_page is None:
-        per_page = _get_page_size_from_cookie("restaurant_page_size", PER_PAGE)
-    else:
-        # Validate per_page value
-        if per_page not in [10, 25, 50, 100, SHOW_ALL]:
-            per_page = PER_PAGE
-        else:
-            save_preference = True
+    offset = max(0, request.args.get("offset", 0, type=int))
+    limit = min(
+        max(1, request.args.get("limit", DEFAULT_LIST_PAGE_SIZE, type=int)),
+        MAX_LIST_PAGE_SIZE,
+    )
 
-    # Only load restaurants data for restaurants tab
     if tab == "restaurants":
-        # Get all restaurants and stats
-        restaurants, stats = services.get_restaurants_with_stats(current_user.id, request.args)
-
-        # Handle pagination or show all
-        total_restaurants = len(restaurants)
-        if per_page == SHOW_ALL:
-            # Show all restaurants without pagination
-            paginated_restaurants = restaurants
-            total_pages = 1
-            page = 1
-        else:
-            # Calculate pagination with bounds checking
-            total_pages = max(1, (total_restaurants + per_page - 1) // per_page) if total_restaurants else 1
-            page = max(1, min(page, total_pages))  # Ensure page is within bounds
-            start_idx = (page - 1) * per_page
-            end_idx = start_idx + per_page
-            paginated_restaurants = restaurants[start_idx:end_idx]
-
-        # Get filter options for the filter form
+        (
+            paginated_restaurants,
+            total_restaurants,
+            stats,
+        ) = services.get_restaurants_with_stats_paginated(current_user.id, request.args, offset=offset, limit=limit)
+        has_more = (offset + len(paginated_restaurants)) < total_restaurants
+        next_offset = offset + limit
         filter_options = services.get_filter_options(current_user.id)
-
-        # Extract current filter values
         filters = services.get_restaurant_filters(request.args)
 
+        is_htmx = request.headers.get("HX-Request") == "true"
+        if is_htmx and offset > 0:
+            return render_template(
+                "restaurants/_list_chunk.html",
+                restaurants=paginated_restaurants,
+                has_more=has_more,
+                next_offset=next_offset,
+                total_restaurants=total_restaurants,
+                total_spent=stats.get("total_spent", 0),
+                search=filters["search"],
+                cuisine=filters["cuisine"],
+                service_level=filters["service_level"],
+                city=filters["city"],
+                is_chain=filters["is_chain"],
+                merchant_status=filters["merchant_status"],
+                missing_location_name=filters["missing_location_name"],
+                rating_min=filters["rating_min"],
+                rating_max=filters["rating_max"],
+            )
     else:
-        # For places tab, use empty data
         paginated_restaurants = []
-        stats = {"total_spent": 0, "avg_price_per_person": 0}
         total_restaurants = 0
-        total_pages = 1
+        stats = {"total_spent": 0, "avg_price_per_person": 0}
+        has_more = False
+        next_offset = 0
         filters = services.get_restaurant_filters(request.args)
         filter_options = services.get_filter_options(current_user.id)
 
@@ -888,23 +920,20 @@ def list_restaurants() -> Any:
     if places_mode not in ["my", "nearby", "find"]:
         places_mode = "my"
 
-    response = make_response(
+    return make_response(
         _render_restaurant_list(
             paginated_restaurants=paginated_restaurants,
             stats=stats,
-            page=page,
-            per_page=per_page,
-            total_pages=total_pages,
             total_restaurants=total_restaurants,
+            has_more=has_more,
+            next_offset=next_offset,
             filters=filters,
             filter_options=filter_options,
             active_tab=tab,
             places_mode=places_mode,
+            is_htmx=request.headers.get("HX-Request") == "true",
         )
     )
-    if save_preference:
-        response.set_cookie("restaurant_page_size", str(per_page), max_age=60 * 60 * 24 * 365)  # 1 year
-    return response
 
 
 def _create_ajax_success_response(restaurant: Restaurant, is_new: bool) -> tuple[Response, int]:
@@ -1037,6 +1066,27 @@ def add_restaurant() -> str | Response | tuple[Response, int]:
     _populate_merchant_choices(form, current_user.id)
     is_ajax = request.headers.get("X-Requested-With") == "XMLHttpRequest"
 
+    if request.method == "GET":
+        prefill_map = {
+            "name": request.args.get("name", "").strip(),
+            "location_name": request.args.get("location_name", "").strip(),
+            "address_line_1": request.args.get("address_line_1", "").strip(),
+            "city": request.args.get("city", "").strip(),
+            "state": request.args.get("state", "").strip(),
+            "postal_code": request.args.get("postal_code", "").strip(),
+            "notes": request.args.get("notes", "").strip(),
+            "website": request.args.get("website", "").strip(),
+            "cuisine": request.args.get("cuisine", "").strip(),
+            "service_level": request.args.get("service_level", "").strip(),
+        }
+        for field_name, field_value in prefill_map.items():
+            if field_value and hasattr(form, field_name):
+                getattr(form, field_name).data = field_value
+
+        merchant_id = request.args.get("merchant_id", "").strip()
+        if merchant_id.isdigit():
+            form.merchant_id.data = int(merchant_id)
+
     if form.validate_on_submit():
         response = _process_restaurant_form_submission(form, is_ajax)
         if response:
@@ -1053,7 +1103,14 @@ def add_restaurant() -> str | Response | tuple[Response, int]:
         "restaurants/form.html",
         form=form,
         is_edit=False,
+        selected_merchant=_get_selected_merchant_for_form(form),
         type_choices_grouped=get_restaurant_type_form_choices_grouped(),
+        merchant_categories=merchant_services.get_merchant_categories(),
+        merchant_format_category_groups=merchant_services.get_merchant_format_category_groups(),
+        merchant_service_levels=merchant_services.get_merchant_service_levels(),
+        merchant_cuisine_choices=get_cuisine_choices(),
+        merchant_format_labels=merchant_services.MERCHANT_FORMAT_CATEGORY_LABELS,
+        restaurant_search_prefill=request.args.get("search_query", "").strip() or request.args.get("name", "").strip(),
     )
 
 
@@ -1108,6 +1165,11 @@ def restaurant_details(restaurant_id: int) -> str | Response:
                 form=form,
                 is_edit=True,
                 type_choices_grouped=get_restaurant_type_form_choices_grouped(),
+                merchant_categories=merchant_services.get_merchant_categories(),
+                merchant_format_category_groups=merchant_services.get_merchant_format_category_groups(),
+                merchant_service_levels=merchant_services.get_merchant_service_levels(),
+                merchant_cuisine_choices=get_cuisine_choices(),
+                merchant_format_labels=merchant_services.MERCHANT_FORMAT_CATEGORY_LABELS,
             )
 
     # Load expenses for the restaurant
@@ -1126,6 +1188,11 @@ def restaurant_details(restaurant_id: int) -> str | Response:
         expense_stats=expense_stats,
         form=detail_form,
         type_choices_grouped=get_restaurant_type_form_choices_grouped(),
+        merchant_categories=merchant_services.get_merchant_categories(),
+        merchant_format_category_groups=merchant_services.get_merchant_format_category_groups(),
+        merchant_service_levels=merchant_services.get_merchant_service_levels(),
+        merchant_cuisine_choices=get_cuisine_choices(),
+        merchant_format_labels=merchant_services.MERCHANT_FORMAT_CATEGORY_LABELS,
     )
 
 
@@ -1152,6 +1219,9 @@ def edit_restaurant(restaurant_id: int) -> str | Response:
         try:
             # Update restaurant with form data
             services.update_restaurant(restaurant.id, current_user.id, form)
+            safe_next_url = _get_safe_redirect_path(request.form.get("next") or request.args.get("next"))
+            if safe_next_url:
+                return redirect(safe_next_url)  # type: ignore[return-value]
             # Redirect without flash message - success feedback handled by destination page
             return redirect(url_for("restaurants.restaurant_details", restaurant_id=restaurant.id))  # type: ignore[return-value]
         except (
@@ -1170,13 +1240,23 @@ def edit_restaurant(restaurant_id: int) -> str | Response:
         # Pre-populate form with existing data
         form = RestaurantForm(obj=restaurant)
         _populate_merchant_choices(form, current_user.id)
+        # Normalize state to USPS code so the state picklist selects the right option
+        if restaurant.state:
+            form.state.data = normalize_state_to_usps(restaurant.state) or restaurant.state
 
     return render_template(
         "restaurants/form.html",
         form=form,
         is_edit=True,
         restaurant=restaurant,
+        selected_merchant=_get_selected_merchant_for_form(form, restaurant),
         type_choices_grouped=get_restaurant_type_form_choices_grouped(),
+        merchant_categories=merchant_services.get_merchant_categories(),
+        merchant_format_category_groups=merchant_services.get_merchant_format_category_groups(),
+        merchant_service_levels=merchant_services.get_merchant_service_levels(),
+        merchant_cuisine_choices=get_cuisine_choices(),
+        merchant_format_labels=merchant_services.MERCHANT_FORMAT_CATEGORY_LABELS,
+        return_url=_get_safe_redirect_path(request.args.get("next")) or "",
     )
 
 
@@ -1310,6 +1390,7 @@ def export_restaurants() -> Response:
             {
                 "name": "Joe's Pizza",
                 "location_name": "Downtown",
+                "located_within": "Union Square",
                 "city": "New York",
                 "type": "restaurant",
                 "address": "123 Main St",
@@ -1321,6 +1402,7 @@ def export_restaurants() -> Response:
             {
                 "name": "Coffee House",
                 "location_name": "Market Street",
+                "located_within": "Ferry Building",
                 "city": "San Francisco",
                 "type": "cafe",
                 "address": "456 Market St",
@@ -1339,7 +1421,18 @@ def export_restaurants() -> Response:
 
         # Default to CSV format - include required fields (name, city) first
         output = io.StringIO()
-        fieldnames = ["name", "location_name", "city", "type", "address", "phone", "website", "cuisine", "notes"]
+        fieldnames = [
+            "name",
+            "location_name",
+            "located_within",
+            "city",
+            "type",
+            "address",
+            "phone",
+            "website",
+            "cuisine",
+            "notes",
+        ]
         writer = csv.DictWriter(output, fieldnames=fieldnames, quoting=csv.QUOTE_NONNUMERIC)
         writer.writeheader()
         writer.writerows(sample_data)
@@ -1564,45 +1657,57 @@ def _prepare_restaurant_form(
     """
     from flask import jsonify
 
-    from app.restaurants.forms import RestaurantForm
-    from app.utils.url_utils import strip_url_query_params
+    from app.restaurants import forms as restaurant_forms
+    from app.utils.url_utils import canonicalize_website_for_storage
 
-    # Detect service level from Google Places data if available
-    # PRO TIER: Uses price_level, types for service level detection
-    # ENTERPRISE TIER: Uses rating, user_ratings_total for confidence scoring
+    # Detect service level from Google Places data if available (existing/same payload only, no extra Google call)
+    # PRO TIER: primaryType, types, price_level. ENTERPRISE: rating, user_ratings_total.
     service_level = None
-    if any(key in data for key in ["price_level", "types", "rating", "user_ratings_total"]):
+    if any(
+        key in data for key in ["price_level", "types", "rating", "user_ratings_total", "primaryType", "primary_type"]
+    ):
         from app.restaurants.services import detect_service_level_from_google_data
 
         google_places_data = {
             "price_level": data.get("price_level"),
+            "priceLevel": data.get("priceLevel"),
             "types": data.get("types", []),
+            "primaryType": data.get("primaryType") or data.get("primary_type"),
+            "name": data.get("name"),
+            "displayName": data.get("displayName"),
             "rating": data.get("rating"),
             "user_ratings_total": data.get("user_ratings_total"),
+            "merchant_category": data.get("merchant_category"),
+            "merchant_category_hint": data.get("merchant_category_hint"),
         }
 
         detected_level, confidence = detect_service_level_from_google_data(google_places_data)
         if confidence > 0.3:  # Only use if confidence is reasonable
             service_level = detected_level
 
+    description = (data.get("description") or "").strip()
     form_data = {
         "name": data.get("name", ""),
+        "type": data.get("type") or "restaurant",
         "address": data.get("formatted_address") or data.get("address", ""),
         "city": data.get("city", ""),
         "state": data.get("state", ""),
         "postal_code": data.get("postal_code", ""),
         "country": data.get("country", ""),
         "phone": data.get("nationalPhoneNumber") or data.get("phone", ""),
-        "website": strip_url_query_params(data.get("websiteUri") or data.get("website", "")) or "",
+        "website": canonicalize_website_for_storage(data.get("websiteUri") or data.get("website", "")) or "",
         "google_place_id": data.get("id") or data.get("google_place_id", ""),
         "service_level": service_level,
+        "description": description[:500] if description else "",
         # Note: coordinates would be looked up dynamically from Google Places API
         "csrf_token": csrf_token,
     }
 
     current_app.logger.debug(f"Form data prepared: {form_data}")
 
-    form = RestaurantForm(data=form_data)
+    form_class = RestaurantForm if RestaurantForm is not _ROUTE_RESTAURANT_FORM else restaurant_forms.RestaurantForm
+
+    form = form_class(data=form_data)
     current_app.logger.debug("Form created. Validating...")
 
     if not form.validate():
@@ -1935,7 +2040,7 @@ def search_restaurants() -> str:
     # Check for per_page in URL params first, then cookie, then default
     per_page = request.args.get("per_page", type=int)
     if per_page is None:
-        per_page = _get_page_size_from_cookie("restaurant_page_size", PER_PAGE)
+        per_page = DEFAULT_LIST_PAGE_SIZE
     sort = request.args.get("sort", "name")
     order = request.args.get("order", "asc")
 

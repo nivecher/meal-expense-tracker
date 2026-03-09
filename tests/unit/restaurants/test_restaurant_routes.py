@@ -6,6 +6,11 @@ import io
 from flask import url_for
 from werkzeug.datastructures import FileStorage
 
+from app.extensions import db
+from app.merchants.models import Merchant
+from app.restaurants import routes as restaurant_routes
+from app.restaurants.models import Restaurant
+
 
 def test_list_restaurants(client, auth, test_restaurant, test_user) -> None:
     """Test listing all restaurants."""
@@ -15,6 +20,67 @@ def test_list_restaurants(client, auth, test_restaurant, test_user) -> None:
     assert response.status_code == 200
     assert b"Restaurants" in response.data
     assert test_restaurant.name.encode() in response.data
+
+
+def test_list_restaurants_shows_location_name_cta_for_chain_restaurant_missing_location(
+    client, auth, test_user
+) -> None:
+    """Restaurants list should prompt users to add a location name for chain-linked merchants."""
+    test_user.advanced_features_enabled = True
+    db.session.add(test_user)
+    db.session.flush()
+
+    merchant = Merchant(
+        name="Chipotle Mexican Grill",
+        short_name="Chipotle",
+        is_chain=True,
+    )
+    db.session.add(merchant)
+    db.session.flush()
+
+    restaurant = Restaurant(
+        user_id=test_user.id,
+        name="Chipotle",
+        type="restaurant",
+        merchant_id=merchant.id,
+        location_name="",
+        city="Dallas",
+    )
+    db.session.add(restaurant)
+    db.session.commit()
+
+    auth.login("testuser_1", "testpass")
+    response = client.get(url_for("restaurants.list_restaurants"), follow_redirects=True)
+
+    assert response.status_code == 200
+    assert b"Add location name" in response.data
+    expected_edit_url = url_for(
+        "restaurants.edit_restaurant",
+        restaurant_id=restaurant.id,
+        next=url_for("restaurants.list_restaurants", missing_location_name="true"),
+    )
+    assert f'href="{expected_edit_url}#location_name"'.encode() in response.data
+
+
+def test_list_restaurants_infinite_scroll_chunk(client, auth, test_restaurant, test_user) -> None:
+    """Test restaurant list returns chunk partial when HTMX requests with offset."""
+    auth.login("testuser_1", "testpass")
+    response = client.get(
+        url_for("restaurants.list_restaurants", tab="restaurants", offset=0, limit=25),
+        follow_redirects=True,
+    )
+    assert response.status_code == 200
+    response = client.get(
+        url_for("restaurants.list_restaurants", tab="restaurants", offset=25, limit=25),
+        headers={"HX-Request": "true"},
+        follow_redirects=True,
+    )
+    assert response.status_code == 200
+    assert (
+        b"restaurant-chunk-buffer" in response.data
+        or b"restaurant-load-more-sentinel" in response.data
+        or len(response.data) < 500
+    )
 
 
 def test_add_restaurant(client, test_user, session) -> None:
@@ -27,6 +93,7 @@ def test_add_restaurant(client, test_user, session) -> None:
     # Get the add restaurant page to get a fresh CSRF token
     response = client.get(url_for("restaurants.add_restaurant"))
     assert response.status_code == 200
+    assert b"Is Chain?" not in response.data
 
     # Since we're in test mode, we can use a dummy CSRF token
     response = client.post(
@@ -49,6 +116,84 @@ def test_add_restaurant(client, test_user, session) -> None:
     assert b"New Test Restaurant" in response.data
 
 
+def test_add_restaurant_prefills_from_merchant_query_args(client, auth, test_user) -> None:
+    """Merchant-origin add restaurant links should prefill the restaurant form and search query."""
+    merchant = Merchant(
+        name="Blue Baker",
+        cuisine="American",
+        service_level="fast_casual",
+        website="https://bluebaker.example",
+    )
+    db.session.add(merchant)
+    db.session.commit()
+    auth.login("testuser_1", "testpass")
+
+    response = client.get(
+        url_for(
+            "restaurants.add_restaurant",
+            merchant_id=merchant.id,
+            name=merchant.name,
+            cuisine=merchant.cuisine,
+            service_level=merchant.service_level,
+            website=merchant.website,
+            search_query="Blue Baker",
+        )
+    )
+
+    assert response.status_code == 200
+    assert b'value="Blue Baker"' in response.data
+    assert b'data-initial-query="Blue Baker"' in response.data
+    assert b"https://bluebaker.example" in response.data
+    assert b"restaurant-search-include-nearby" in response.data
+
+
+def test_add_restaurant_shows_chain_merchant_status_and_requires_location_name(client, auth, test_user) -> None:
+    """Chain merchants should be visible on the form and require a location name."""
+    test_user.advanced_features_enabled = True
+    db.session.add(test_user)
+    db.session.commit()
+
+    merchant = Merchant(
+        name="Blue Baker",
+        short_name="Blue Baker",
+        is_chain=True,
+        cuisine="American",
+        service_level="fast_casual",
+    )
+    db.session.add(merchant)
+    db.session.commit()
+    auth.login("testuser_1", "testpass")
+
+    response = client.get(
+        url_for(
+            "restaurants.add_restaurant",
+            merchant_id=merchant.id,
+            name=merchant.name,
+        )
+    )
+
+    assert response.status_code == 200
+    assert b"Brand: Chain Brand" in response.data
+    assert b"location-name-required-indicator" in response.data
+    assert b"Required for chain brands so each location stays distinct." in response.data
+
+    response = client.post(
+        url_for("restaurants.add_restaurant"),
+        data={
+            "csrf_token": "dummy_csrf_token",
+            "name": "Blue Baker",
+            "type": "restaurant",
+            "merchant_id": str(merchant.id),
+            "merchant_name": merchant.name,
+            "location_name": "",
+        },
+        follow_redirects=True,
+    )
+
+    assert response.status_code == 200
+    assert b"Location Name is required when the linked merchant is a chain brand." in response.data
+
+
 def test_view_restaurant(client, auth, test_restaurant, test_user) -> None:
     """Test viewing a restaurant's details."""
     auth.login("testuser_1", "testpass")
@@ -58,6 +203,23 @@ def test_view_restaurant(client, auth, test_restaurant, test_user) -> None:
     assert response.status_code == 200
     assert test_restaurant.name.encode() in response.data
     assert test_restaurant.city.encode() in response.data
+
+
+def test_view_restaurant_shows_merchant_chain_info(client, auth, test_restaurant, test_user) -> None:
+    """Restaurant detail should show associated merchant chain info instead of restaurant chain info."""
+    merchant = Merchant(name="Blue Baker", is_chain=True)
+    db.session.add(merchant)
+    db.session.flush()
+    test_restaurant.merchant_id = merchant.id
+    db.session.add(test_restaurant)
+    db.session.commit()
+
+    auth.login("testuser_1", "testpass")
+    response = client.get(url_for("restaurants.restaurant_details", restaurant_id=test_restaurant.id))
+
+    assert response.status_code == 200
+    assert b"Chain Brand" in response.data
+    assert b"Chain Restaurant" not in response.data
 
 
 def test_edit_restaurant(client, auth, test_restaurant, test_user) -> None:
@@ -81,6 +243,72 @@ def test_edit_restaurant(client, auth, test_restaurant, test_user) -> None:
     assert response.status_code == 200
     # The restaurant should be updated (redirected to restaurant details page)
     assert b"Updated Name" in response.data
+
+
+def test_edit_restaurant_preserves_safe_next_url_in_form(client, auth, test_restaurant, test_user) -> None:
+    """Edit form should preserve a safe return URL for bulk location-name cleanup."""
+    auth.login("testuser_1", "testpass")
+
+    next_url = url_for("restaurants.list_restaurants", missing_location_name="true")
+    response = client.get(url_for("restaurants.edit_restaurant", restaurant_id=test_restaurant.id, next=next_url))
+
+    assert response.status_code == 200
+    assert f'href="{next_url}"'.encode() in response.data
+    assert f'<input type="hidden" name="next" value="{next_url}">'.encode() in response.data
+
+
+def test_edit_restaurant_drops_unsafe_next_url_from_form(client, auth, test_restaurant, test_user) -> None:
+    """Edit form should not preserve an external return URL."""
+    auth.login("testuser_1", "testpass")
+
+    response = client.get(
+        url_for("restaurants.edit_restaurant", restaurant_id=test_restaurant.id, next="https://evil.example/return")
+    )
+
+    assert response.status_code == 200
+    assert b"https://evil.example/return" not in response.data
+
+
+def test_edit_restaurant_ignores_unsafe_next_redirect(client, auth, monkeypatch, test_restaurant, test_user) -> None:
+    """Restaurant edit should ignore an external next redirect."""
+    auth.login("testuser_1", "testpass")
+
+    monkeypatch.setattr(restaurant_routes.RestaurantForm, "validate_on_submit", lambda self: True)
+    monkeypatch.setattr(restaurant_routes.services, "update_restaurant", lambda *args, **kwargs: None)
+
+    response = client.post(
+        url_for("restaurants.edit_restaurant", restaurant_id=test_restaurant.id),
+        data={
+            "next": "https://evil.example/return",
+        },
+    )
+
+    assert response.status_code == 302
+    assert response.headers["Location"].endswith(f"/restaurants/{test_restaurant.id}")
+    assert "evil.example" not in response.headers["Location"]
+
+
+def test_restaurant_form_normalizes_us_phone_number(app) -> None:
+    """Restaurant form should normalize a plain US phone number during validation."""
+    from app.restaurants.forms import RestaurantForm
+
+    with app.test_request_context(
+        "/restaurants/add",
+        method="POST",
+        data={
+            "name": "Phone Normalized Restaurant",
+            "type": "restaurant",
+            "city": "Test City",
+            "address_line_1": "123 Test St",
+            "phone": "(312) 521-9788",
+            "website": "",
+            "cuisine": "",
+        },
+    ):
+        form = RestaurantForm()
+
+        assert form.validate() is True
+        assert form.phone.data == "+13125219788"
 
 
 def test_delete_restaurant(client, auth, test_restaurant, test_user, session) -> None:
@@ -188,7 +416,7 @@ def test_export_restaurants(client, test_restaurant, test_user) -> None:
     print(f"CSV data first line: {response_text.splitlines()[0] if response_text else 'Empty response'}")
 
     # Check for CSV header (actual headers from the export)
-    assert '"name","location_name","address","city","state","postal_code"' in response_text
+    assert '"name","location_name","located_within","address","city","state","postal_code"' in response_text
 
     # Check for test restaurant data
     assert test_restaurant.name in response_text

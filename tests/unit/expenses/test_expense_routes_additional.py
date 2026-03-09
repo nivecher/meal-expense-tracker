@@ -1,9 +1,16 @@
 """Additional tests for expense routes to improve coverage."""
 
 import csv
+from datetime import UTC, datetime
+from decimal import Decimal
 import io
 
 from werkzeug.datastructures import FileStorage
+
+from app.expenses.models import Category, Expense
+from app.extensions import db
+from app.receipts.models import Receipt
+from app.restaurants.models import Restaurant
 
 
 class TestExpenseRoutesAdditional:
@@ -82,7 +89,7 @@ class TestExpenseRoutesAdditional:
         )
 
         assert response.status_code == 200
-        assert b"expenses" in response.data or b"success" in response.data
+        assert b"Review Expense Import" in response.data
 
         # Test invalid file type
         file_data = io.BytesIO(b"This is not a CSV file")
@@ -96,7 +103,7 @@ class TestExpenseRoutesAdditional:
         )
 
         assert response.status_code == 200
-        assert b"Unsupported file type" in response.data or b"error" in response.data
+        assert b"Invalid file type" in response.data or b"error" in response.data
 
     def test_tag_operations(self, client, auth, test_user) -> None:
         """Test tag CRUD operations."""
@@ -154,9 +161,73 @@ class TestExpenseRoutesAdditional:
         response = client.get("/expenses", query_string={"tags": "business"}, follow_redirects=True)
         assert response.status_code == 200
 
-        # Test pagination
-        response = client.get("/expenses", query_string={"page": "2", "per_page": "10"}, follow_redirects=True)
+        # Test infinite-scroll chunk (offset/limit)
+        response = client.get("/expenses", query_string={"offset": "0", "limit": "25"}, follow_redirects=True)
         assert response.status_code == 200
+        # Chunk request (HTMX with offset > 0) returns partial
+        response = client.get(
+            "/expenses",
+            query_string={"offset": "25", "limit": "25"},
+            headers={"HX-Request": "true"},
+            follow_redirects=True,
+        )
+        assert response.status_code == 200
+        # Chunk response contains expense-chunk-buffer or empty content when no more
+        assert (
+            b"expense-chunk-buffer" in response.data
+            or b"expense-load-more-sentinel" in response.data
+            or len(response.data) < 500
+        )
+
+    def test_receipts_tab_renders_reconciliation_data(self, client, auth, app, test_user) -> None:
+        """Test the receipts tab shows reconciliation content and linked records."""
+        auth.login("testuser_1", "testpass")
+        expense_id = None
+
+        with app.app_context():
+            restaurant = Restaurant(
+                name="Receipt Test Restaurant",
+                address_line_1="123 Receipt St",
+                city="Receipt City",
+                state="TX",
+                postal_code="75001",
+                country="United States",
+                user_id=test_user.id,
+            )
+            category = Category(name="Receipt Category", user_id=test_user.id)
+            db.session.add_all([restaurant, category])
+            db.session.commit()
+
+            expense = Expense(
+                amount=Decimal("18.75"),
+                date=datetime.now(UTC),
+                notes="Receipt route test",
+                user_id=test_user.id,
+                restaurant_id=restaurant.id,
+                category_id=category.id,
+                receipt_image="receipts/receipt-route-test.png",
+            )
+            db.session.add(expense)
+            db.session.commit()
+            db.session.refresh(expense)
+            expense_id = expense.id
+
+            receipt = Receipt(
+                user_id=test_user.id,
+                expense_id=expense.id,
+                file_uri="receipts/receipt-route-test.png",
+                ocr_total=Decimal("18.75"),
+            )
+            db.session.add(receipt)
+            db.session.commit()
+
+        response = client.get("/expenses", query_string={"view": "receipts"}, follow_redirects=True)
+
+        assert response.status_code == 200
+        assert b"Receipt Reconciliation" in response.data
+        assert b"receipts/receipt-route-test.png" in response.data
+        assert expense_id is not None
+        assert f"Expense #{expense_id}".encode() in response.data
 
     def test_expense_routes_unauthorized_access(self, client) -> None:
         """Test unauthorized access to expense routes."""

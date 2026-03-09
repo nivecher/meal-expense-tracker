@@ -1,0 +1,218 @@
+{% extends "base.html" %} {% block title %}Associate Restaurants - Meal Expense Tracker{% endblock %} {% block
+main_container_class %}container-fluid{% endblock %} {% block section_header %}
+<div class="section-title">
+    <i class="fas fa-building text-primary"></i>
+    <h1>Merchants</h1>
+</div>
+{% endblock %} {% block content %}
+<ul class="nav nav-tabs mb-3" id="merchantTabs" role="tablist">
+    <li class="nav-item" role="presentation">
+        <a class="nav-link" href="{{ url_for('merchants.list_merchants') }}"> <i class="fas fa-list me-1"></i>List </a>
+    </li>
+    <li class="nav-item" role="presentation">
+        <a class="nav-link active" href="{{ url_for('merchants.review_restaurant_associations') }}">
+            <i class="fas fa-link me-1"></i>Associations
+        </a>
+    </li>
+    <li class="nav-item" role="presentation">
+        <a class="nav-link" href="{{ url_for('loyalty.list_rewards_programs') }}">
+            <i class="fas fa-award me-1"></i>Loyalty
+        </a>
+    </li>
+</ul>
+
+<div class="px-0 pt-2">
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+        <div>
+            <h1 class="h4 mb-1"> <i class="fas fa-link text-primary me-2"></i>Associate Restaurants to Merchants </h1>
+            <p class="text-muted mb-0">
+                {{ total_unlinked }} unlinked restaurant{{ 's' if total_unlinked != 1 else '' }}, {{ suggested_count }}
+                with strong merchant suggestions
+            </p>
+        </div>
+        <div class="d-flex gap-2">
+            <a
+                href="{{ url_for('restaurants.list_restaurants', merchant_status='unlinked') }}"
+                class="btn btn-outline-secondary">
+                <i class="fas fa-list me-1"></i>View Unlinked Restaurants
+            </a>
+            <a href="{{ url_for('merchants.list_merchants') }}" class="btn btn-outline-secondary">
+                <i class="fas fa-building me-1"></i>Back to Merchants
+            </a>
+        </div>
+    </div>
+
+    {% if not association_rows %}
+    <div class="alert alert-success">
+        <i class="fas fa-check-circle me-2"></i>All restaurants are already linked to merchants.
+    </div>
+    {% else %}
+    <div class="card">
+        <div class="card-header bg-white d-flex flex-wrap justify-content-between align-items-center gap-2">
+            <div class="fw-semibold">Suggested Matches</div>
+            <form method="post" action="{{ url_for('merchants.apply_suggested_restaurant_associations') }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+                <button
+                    type="submit"
+                    class="btn btn-sm btn-success"
+                    {% if suggested_count == 0 %}disabled{% endif %}>
+                    <i class="fas fa-check-double me-1"></i>Accept All Suggestions
+                </button>
+            </form>
+        </div>
+        <div class="card-body p-0">
+            <form method="post" action="{{ url_for('merchants.apply_suggested_restaurant_associations') }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0 align-middle">
+                        <thead class="table-light">
+                            <tr>
+                                <th class="text-center" style="width: 48px">
+                                    <input type="checkbox" class="form-check-input" id="associate-select-all" />
+                                </th>
+                                <th>Restaurant</th>
+                                <th>Suggested Merchant</th>
+                                <th>Status</th>
+                                <th class="text-end">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for row in association_rows %} {% set restaurant = row.restaurant %} {% set
+                            suggested_merchant = row.suggested_merchant %} {% set create_prefill =
+                            row.create_merchant_prefill %}
+                            <tr>
+                                <td class="text-center">
+                                    <input
+                                        type="checkbox"
+                                        class="form-check-input associate-select-row"
+                                        name="restaurant_ids"
+                                        value="{{ restaurant.id }}"
+                                        {%
+                                        if
+                                        suggested_merchant
+                                        %}checked{%
+                                        else
+                                        %}disabled{%
+                                        endif
+                                        %} />
+                                </td>
+                                <td>
+                                    <div class="fw-semibold">{{ restaurant.display_name }}</div>
+                                    <div class="text-muted small">{{ restaurant.city or 'City not set' }}</div>
+                                    {% if create_prefill.website or create_prefill.service_level or
+                                    create_prefill.cuisine or create_prefill.menu_focus or create_prefill.category !=
+                                    'other' %}
+                                    <div class="text-muted small">
+                                        {% if create_prefill.website %}
+                                        <span
+                                            >{{ create_prefill.website|replace('https://', '')|replace('http://', '')
+                                            }}</span
+                                        >
+                                        {% endif %} {% if create_prefill.website and (create_prefill.service_level or
+                                        create_prefill.cuisine or create_prefill.menu_focus or create_prefill.category
+                                        != 'other') %} • {% endif %} {% if create_prefill.service_level %}
+                                        <span>Service: {{ create_prefill.service_level.replace('_', ' ')|title }}</span>
+                                        {% endif %} {% if create_prefill.service_level and (create_prefill.cuisine or
+                                        create_prefill.menu_focus or create_prefill.category != 'other') %} • {% endif
+                                        %} {% if create_prefill.cuisine %}
+                                        <span>Cuisine: {{ create_prefill.cuisine }}</span>
+                                        {% endif %} {% if create_prefill.cuisine and (create_prefill.menu_focus or
+                                        create_prefill.category != 'other') %} • {% endif %} {% if
+                                        create_prefill.menu_focus %}
+                                        <span>Menu: {{ create_prefill.menu_focus }}</span>
+                                        {% endif %} {% if create_prefill.menu_focus and create_prefill.category !=
+                                        'other' %} • {% endif %} {% if create_prefill.category != 'other' %}
+                                        <span
+                                            >Format: {{ merchant_format_labels.get(create_prefill.category,
+                                            create_prefill.category|replace('_', ' ')|title) }}</span
+                                        >
+                                        {% endif %}
+                                    </div>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if suggested_merchant %}
+                                    <div class="fw-semibold">{{ suggested_merchant.name }}</div>
+                                    <div class="text-muted small">
+                                        {% if suggested_merchant.short_name %}{{ suggested_merchant.short_name }}{%
+                                        endif %} {% if suggested_merchant.short_name and
+                                        (suggested_merchant.service_level or suggested_merchant.cuisine or
+                                        suggested_merchant.menu_focus or suggested_merchant.category) %} • {% endif %}
+                                        {% if suggested_merchant.service_level %}Service: {{
+                                        suggested_merchant.service_level_display or
+                                        suggested_merchant.service_level|replace('_', ' ')|title }}{% endif %} {% if
+                                        suggested_merchant.service_level and (suggested_merchant.cuisine or
+                                        suggested_merchant.menu_focus or suggested_merchant.category) %} • {% endif %}
+                                        {% if suggested_merchant.cuisine %}Cuisine: {{ suggested_merchant.cuisine }}{%
+                                        endif %} {% if suggested_merchant.cuisine and (suggested_merchant.menu_focus or
+                                        suggested_merchant.category) %} • {% endif %} {% if
+                                        suggested_merchant.menu_focus %}Menu: {{ suggested_merchant.menu_focus }}{%
+                                        endif %} {% if suggested_merchant.menu_focus and suggested_merchant.category %}
+                                        • {% endif %} {% if suggested_merchant.category %}Format: {{
+                                        suggested_merchant.category_display or
+                                        merchant_format_labels.get(suggested_merchant.category,
+                                        suggested_merchant.category|replace('_', ' ')|title) }}{% endif %}
+                                    </div>
+                                    {% else %}
+                                    <span class="text-muted">No strong suggestion</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if suggested_merchant %}
+                                    <span class="badge bg-success-subtle text-success border border-success-subtle"
+                                        >Ready to link</span
+                                    >
+                                    {% else %}
+                                    <span class="badge bg-light text-muted border">Needs review</span>
+                                    {% endif %}
+                                </td>
+                                <td class="text-end">
+                                    <a
+                                        href="{{ url_for('merchants.new_merchant', restaurant_id=restaurant.id, redirect_to=url_for('merchants.review_restaurant_associations')) }}"
+                                        class="btn btn-sm btn-primary">
+                                        <i class="fas fa-plus me-1"></i>Create Merchant
+                                    </a>
+                                    <a
+                                        href="{{ url_for('restaurants.edit_restaurant', restaurant_id=restaurant.id) }}"
+                                        class="btn btn-sm btn-outline-primary">
+                                        <i class="fas fa-pen me-1"></i>Edit
+                                    </a>
+                                    {% if suggested_merchant %}
+                                    <a
+                                        href="{{ url_for('merchants.view_merchant', merchant_id=suggested_merchant.id) }}"
+                                        class="btn btn-sm btn-outline-secondary">
+                                        <i class="fas fa-eye me-1"></i>Merchant
+                                    </a>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                <div class="card-footer bg-white d-flex justify-content-between align-items-center">
+                    <span class="text-muted small"
+                        >Only restaurants with strong suggestions can be bulk-linked here.</span
+                    >
+                    <button type="submit" class="btn btn-primary" {% if suggested_count == 0 %}disabled{% endif %}>
+                        <i class="fas fa-link me-1"></i>Apply Selected Suggestions
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock content %} {% block extra_js %}
+<script>
+    document.addEventListener("DOMContentLoaded", function () {
+        const selectAll = document.getElementById("associate-select-all");
+        if (!selectAll) return;
+        selectAll.addEventListener("change", function () {
+            document.querySelectorAll(".associate-select-row:not(:disabled)").forEach(function (checkbox) {
+                checkbox.checked = selectAll.checked;
+            });
+        });
+    });
+</script>
+{% endblock extra_js %}

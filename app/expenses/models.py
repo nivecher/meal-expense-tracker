@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import UTC, datetime, timezone
+from datetime import UTC, date as date_cls, datetime, timezone
 from decimal import ROUND_HALF_UP, Decimal
 from typing import TYPE_CHECKING, Any, Dict, Optional
 
@@ -281,7 +281,13 @@ class Expense(BaseModel):
         nullable=False,
         index=True,
         default=lambda: datetime.now(UTC),
-        comment="Date and time when the expense occurred",
+        comment="Visit date and time when the expense occurred",
+    )
+    cleared_date: Mapped[date_cls | None] = mapped_column(
+        db.Date,
+        nullable=True,
+        index=True,
+        comment="Optional cleared date used for financial reconciliation imports",
     )
 
     # Receipt information
@@ -356,6 +362,19 @@ class Expense(BaseModel):
         return f"${self.amount:.2f}"
 
     @property
+    def receipt_storage_path(self) -> str | None:
+        """Return the canonical receipt storage path with legacy fallback."""
+        receipt_obj = self.receipt
+        if receipt_obj is not None and receipt_obj.file_uri:
+            return receipt_obj.file_uri
+        return self.receipt_image
+
+    @property
+    def has_receipt(self) -> bool:
+        """Return whether the expense has an associated receipt reference."""
+        return self.receipt_storage_path is not None
+
+    @property
     def is_recent(self) -> bool:
         """Check if the expense is from the last 7 days."""
         return bool((datetime.now(UTC) - self.date).days <= 7)
@@ -395,11 +414,13 @@ class Expense(BaseModel):
             "order_type": self.order_type,
             "party_size": self.party_size,
             "date": self.date.isoformat() if self.date else None,
+            "cleared_date": self.cleared_date.isoformat() if isinstance(self.cleared_date, date_cls) else None,
             "formatted_amount": self.formatted_amount,
             "price_per_person": (float(self.price_per_person) if self.price_per_person is not None else None),
             "formatted_price_per_person": self.formatted_price_per_person,
             "is_recent": self.is_recent,
             "receipt_image": self.receipt_image,
+            "receipt_storage_path": self.receipt_storage_path,
             "receipt_verified": self.receipt_verified,
             "user_id": self.user_id,
             "restaurant_id": self.restaurant_id,

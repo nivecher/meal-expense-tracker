@@ -5,10 +5,11 @@
 {% block styles %}
     {{ super() }}
     <!-- Select2 CSS -->
-
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/intl-tel-input@25.3.0/build/css/intlTelInput.css" />
     <link rel="stylesheet" href="{{ url_for('static', filename='css/pages/restaurant-form.css') }}">
 {% endblock styles %}
 {% block content %}
+    {% set active_merchant = selected_merchant if selected_merchant is defined and selected_merchant else (restaurant.merchant if restaurant and restaurant.merchant else None) %}
     <!-- Breadcrumb Navigation -->
     {% set breadcrumb_items = [
             {'url': url_for('main.index'), 'title': 'Dashboard'},
@@ -28,7 +29,7 @@
                                 <i class="fas fa-utensils me-2 text-primary"></i>
                                 {{ 'Edit' if is_edit else 'Add New' }} Restaurant
                             </h1>
-                            <a href="{{ url_for('restaurants.list_restaurants') }}"
+                            <a href="{{ return_url or url_for('restaurants.list_restaurants') }}"
                                class="btn btn-sm btn-outline-secondary">
                                 <i class="fas fa-arrow-left me-1"></i> Back to List
                             </a>
@@ -41,6 +42,9 @@
                               novalidate
                               id="restaurantForm">
                             {{ form.hidden_tag() }}
+                            {% if return_url %}
+                            <input type="hidden" name="next" value="{{ return_url }}">
+                            {% endif %}
                             {{ form.latitude() }}
                             {{ form.longitude() }}
                             <!-- Step 1: Search and Google sync -->
@@ -62,11 +66,24 @@
                                 </div>
                                 <div class="row g-3">
                                     <div class="col-12">
-                                        <label for="restaurant-search" class="form-label">Restaurant Search</label>
+                                        <div class="d-flex justify-content-between align-items-center mb-1">
+                                            <label for="restaurant-search" class="form-label mb-0">Restaurant Search</label>
+                                            <div class="restaurant-search-toggle form-check form-check-inline mb-0">
+                                                <input class="form-check-input"
+                                                       type="checkbox"
+                                                       id="restaurant-search-include-nearby"
+                                                       checked>
+                                                <label class="form-check-label" for="restaurant-search-include-nearby">
+                                                    Nearby
+                                                </label>
+                                            </div>
+                                        </div>
                                         <input type="text"
                                                class="form-control"
                                                id="restaurant-search"
                                                data-restaurant-autocomplete
+                                               value="{{ restaurant_search_prefill|default('') }}"
+                                               data-initial-query="{{ restaurant_search_prefill|default('') }}"
                                                placeholder="Search restaurants (e.g., McDonald's or McDonald's Dallas, TX)..."
                                                autocomplete="off">
                                         <div id="restaurant-suggestions" class="mt-2"></div>
@@ -177,6 +194,35 @@
                                     </div>
                                 </div>
                                 <p class="section-intro">Capture the core profile used for search, categorization, and reporting.</p>
+                                <div class="alert alert-light border mb-3" role="status" aria-live="polite">
+                                    <div class="small text-muted mb-1">Restaurant Display Preview</div>
+                                    <div class="d-flex align-items-center gap-2">
+                                        {# Favicon: merchant favicon_url override, then restaurant website, then merchant website #}
+                                        {% if restaurant and restaurant.merchant and restaurant.merchant.favicon_url %}
+                                        <img
+                                            src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"
+                                            data-favicon-url="{{ restaurant.merchant.favicon_url }}"
+                                            data-size="32"
+                                            alt="Restaurant preview icon"
+                                            class="restaurant-favicon"
+                                            id="restaurant-display-preview-favicon"
+                                            width="24"
+                                            height="24" />
+                                        {% else %}
+                                        <img
+                                            src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"
+                                            data-website="{{ form.website.data or (restaurant.merchant.website if restaurant and restaurant.merchant and restaurant.merchant.website else '') }}"
+                                            data-size="32"
+                                            alt="Restaurant preview icon"
+                                            class="restaurant-favicon"
+                                            id="restaurant-display-preview-favicon"
+                                            width="24"
+                                            height="24" />
+                                        {% endif %}
+                                        <i class="fas fa-utensils text-primary restaurant-fallback-icon d-none" id="restaurant-display-preview-fallback"></i>
+                                        <div class="fw-semibold" id="restaurant-display-name-preview">Not enough information yet</div>
+                                    </div>
+                                </div>
                                 <div class="row g-3">
                                     <div class="col-md-6">
                                         <div class="d-flex justify-content-between align-items-center">
@@ -193,15 +239,6 @@
                                                      autocomplete="organization",
                                                      data_field="name") }}
                                         {% for error in form.name.errors %}<div class="invalid-feedback">{{ error }}</div>{% endfor %}
-
-                                        <div class="mt-3">
-                                            <label for="location_name" class="form-label">Location Name</label>
-                                            {{ form.location_name(class_="form-control" + (" is-invalid" if form.location_name.errors else ""),
-                                                                  placeholder="e.g., Downtown, Terminal A",
-                                                                  autocomplete="off",
-                                                                  data_field="location_name") }}
-                                            {% for error in form.location_name.errors %}<div class="invalid-feedback">{{ error }}</div>{% endfor %}
-                                        </div>
                                     </div>
                                     <div class="col-md-6">
                                         <div class="d-flex justify-content-between align-items-center">
@@ -219,7 +256,183 @@
                                     </div>
                                 </div>
                                 <div class="row g-3">
-                                    <div class="col-md-6 ms-md-auto">
+                                    <div class="col-md-6">
+                                        {% if current_user.has_advanced_features or current_user.is_admin %}
+                                        <label for="merchant_name" class="form-label">
+                                            Brand / Merchant
+                                            <span class="badge bg-info text-dark ms-1">Advanced</span>
+                                        </label>
+                                        <div class="merchant-association-panel">
+                                            <div id="merchant-association-summary"
+                                                 class="merchant-association-summary {% if not form.merchant_id.data and not (restaurant and restaurant.merchant) %}d-none{% endif %}">
+                                                <div class="merchant-summary-card">
+                                                    <div>
+                                                        <div class="merchant-summary-label">Linked merchant</div>
+                                                        <div class="merchant-summary-name" id="merchant_summary_name">
+                                                            {{ request.form.get('merchant_name', active_merchant.name if active_merchant else '') }}
+                                                        </div>
+                                                        <div class="merchant-summary-meta" id="merchant_summary_meta">
+                                                            {% if active_merchant %}
+                                                                {% if active_merchant.short_name %}
+                                                                    <span>Alias: {{ active_merchant.short_name }}</span>
+                                                                {% endif %}
+                                                                <span>Brand: {{ 'Chain Brand' if active_merchant.is_chain else 'Independent Brand' }}</span>
+                                                                {% if active_merchant.service_level %}
+                                                                    <span>Service: {{ active_merchant.service_level_display }}</span>
+                                                                {% endif %}
+                                                                {% if active_merchant.cuisine %}
+                                                                    <span>Cuisine: {{ active_merchant.cuisine }}</span>
+                                                                {% endif %}
+                                                                {% if active_merchant.menu_focus %}
+                                                                    <span>Menu: {{ active_merchant.menu_focus }}</span>
+                                                                {% endif %}
+                                                                {% if active_merchant.category %}
+                                                                    <span>Format: {{ active_merchant.category_display }}</span>
+                                                                {% endif %}
+                                                            {% endif %}
+                                                        </div>
+                                                    </div>
+                                                    <div class="merchant-summary-actions">
+                                                        {% if active_merchant %}
+                                                        <a id="merchant_view_link"
+                                                           class="btn btn-sm btn-outline-secondary"
+                                                           href="{{ url_for('merchants.view_merchant', merchant_id=active_merchant.id) }}"
+                                                           target="_blank"
+                                                           rel="noopener noreferrer">
+                                                            <i class="fas fa-external-link-alt me-1"></i>View
+                                                        </a>
+                                                        {% else %}
+                                                        <a id="merchant_view_link"
+                                                           class="btn btn-sm btn-outline-secondary d-none"
+                                                           href="#"
+                                                           target="_blank"
+                                                           rel="noopener noreferrer">
+                                                            <i class="fas fa-external-link-alt me-1"></i>View
+                                                        </a>
+                                                        {% endif %}
+                                                        <button type="button"
+                                                                class="btn btn-sm btn-outline-danger"
+                                                                data-merchant-action="clear-selection">
+                                                            <i class="fas fa-unlink me-1"></i>Clear
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div id="merchant-association-empty"
+                                                 class="merchant-association-empty {% if form.merchant_id.data or (restaurant and restaurant.merchant) %}d-none{% endif %}">
+                                                <div class="merchant-empty-copy">
+                                                    <div class="fw-semibold">No merchant linked yet</div>
+                                                    <div class="text-muted small">Link an existing merchant or create a new one to normalize restaurant reporting.</div>
+                                                </div>
+                                                <div class="merchant-empty-actions">
+                                                    <button type="button"
+                                                            class="btn btn-sm btn-primary"
+                                                            data-merchant-action="focus-search">
+                                                        <i class="fas fa-link me-1"></i>Link a merchant
+                                                    </button>
+                                                    <button type="button"
+                                                            class="btn btn-sm btn-outline-primary"
+                                                            data-merchant-action="open-create">
+                                                        <i class="fas fa-plus me-1"></i>Create new merchant
+                                                    </button>
+                                                </div>
+                                            </div>
+                                            <div id="merchant-suggestion-panel"
+                                                 class="merchant-suggestion-panel d-none"
+                                                 data-suggest-url="{{ url_for('merchants.api_suggest_merchant') }}">
+                                                <div>
+                                                    <div class="merchant-summary-label">Suggested merchant</div>
+                                                    <div class="merchant-summary-name" id="merchant_suggestion_name"></div>
+                                                    <div class="merchant-summary-meta" id="merchant_suggestion_meta"></div>
+                                                </div>
+                                                <div class="merchant-summary-actions">
+                                                    <button type="button"
+                                                            class="btn btn-sm btn-success"
+                                                            id="merchant_accept_suggestion">
+                                                        <i class="fas fa-check me-1"></i>Use suggestion
+                                                    </button>
+                                                </div>
+                                            </div>
+                                            <div class="merchant-search-panel">
+                                                <div class="merchant-search-actions">
+                                                    <button type="button"
+                                                            class="btn btn-sm btn-outline-secondary"
+                                                            data-merchant-action="focus-search">
+                                                        <i class="fas fa-search me-1"></i>Search existing
+                                                    </button>
+                                                    <button type="button"
+                                                            class="btn btn-sm btn-outline-secondary"
+                                                            data-merchant-action="open-create">
+                                                        <i class="fas fa-plus me-1"></i>Create new
+                                                    </button>
+                                                </div>
+                                                <input
+                                                    type="text"
+                                                    class="form-control mt-2"
+                                                    id="merchant_name"
+                                                    name="merchant_name"
+                                                    value="{{ request.form.get('merchant_name', active_merchant.name if active_merchant else '') }}"
+                                                    placeholder="Search for an existing merchant"
+                                                    autocomplete="off"
+                                                    data-merchant-id="{{ active_merchant.id if active_merchant else '' }}"
+                                                    data-merchant-short-name="{{ active_merchant.short_name if active_merchant and active_merchant.short_name else '' }}"
+                                                    data-merchant-category="{{ active_merchant.category if active_merchant and active_merchant.category else '' }}"
+                                                    data-merchant-service-level="{{ active_merchant.service_level if active_merchant and active_merchant.service_level else '' }}"
+                                                    data-merchant-cuisine="{{ active_merchant.cuisine if active_merchant and active_merchant.cuisine else '' }}"
+                                                    data-merchant-menu-focus="{{ active_merchant.menu_focus if active_merchant and active_merchant.menu_focus else '' }}"
+                                                    data-merchant-website="{{ active_merchant.website if active_merchant and active_merchant.website else '' }}"
+                                                    data-merchant-is-chain="{{ 'true' if active_merchant and active_merchant.is_chain else 'false' }}"
+                                                    data-merchant-view-url="{{ url_for('merchants.view_merchant', merchant_id=active_merchant.id) if active_merchant else '' }}"
+                                                    data-merchant-autocomplete
+                                                    data-merchant-select="#merchant_id" />
+                                            </div>
+                                        </div>
+                                        {{ form.merchant_id(class_="form-select d-none" + (" is-invalid" if form.merchant_id.errors else ""), tabindex="-1", aria_hidden="true") }}
+                                        {% for error in form.merchant_id.errors %}<div class="invalid-feedback">{{ error }}</div>{% endfor %}
+                                        <small class="text-muted">Search an existing merchant or create and link a new one.</small>
+                                        {% endif %}
+                                    </div>
+                                    <div class="col-md-6">
+                                        {% if current_user.has_advanced_features or current_user.is_admin %}
+                                        <label for="merchant_alias" class="form-label">Merchant Alias</label>
+                                        <input
+                                            type="text"
+                                            class="form-control bg-light"
+                                            id="merchant_alias"
+                                            value="{{ active_merchant.short_name if active_merchant and active_merchant.short_name else '' }}"
+                                            placeholder="Merchant short name"
+                                            readonly />
+                                        <small class="text-muted">Auto-filled from merchant short name</small>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                <div class="row g-3">
+                                    <div class="col-md-6">
+                                        <label for="location_name" class="form-label">
+                                            Location Name
+                                            <span id="location-name-required-indicator"
+                                                  class="text-danger {% if not (active_merchant and active_merchant.is_chain) %}d-none{% endif %}">*</span>
+                                        </label>
+                                        {{ form.location_name(class_="form-control" + (" is-invalid" if form.location_name.errors else ""),
+                                                              placeholder="e.g., Downtown, Terminal A",
+                                                              autocomplete="off",
+                                                              data_field="location_name") }}
+                                        {% for error in form.location_name.errors %}<div class="invalid-feedback">{{ error }}</div>{% endfor %}
+                                        <div id="location-name-chain-help"
+                                             class="form-text {% if not (active_merchant and active_merchant.is_chain) %}d-none{% endif %}">
+                                            Required for chain brands so each location stays distinct.
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label for="located_within" class="form-label">Located Within</label>
+                                        {{ form.located_within(class_="form-control" + (" is-invalid" if form.located_within.errors else ""),
+                                                               placeholder="e.g., mall, airport, hotel",
+                                                               autocomplete="off") }}
+                                        {% for error in form.located_within.errors %}<div class="invalid-feedback">{{ error }}</div>{% endfor %}
+                                    </div>
+                                </div>
+                                <div class="row g-3">
+                                    <div class="col-md-6">
                                         <div class="d-flex justify-content-between align-items-center">
                                             <label for="cuisine" class="form-label">Cuisine</label>
                                             <div class="validation-indicator" id="cuisine-validation-indicator">
@@ -232,8 +445,6 @@
                                         {{ form.cuisine(class_="form-select" + (" is-invalid" if form.cuisine.errors else ""), data_field="cuisine") }}
                                         {% for error in form.cuisine.errors %}<div class="invalid-feedback">{{ error }}</div>{% endfor %}
                                     </div>
-                                </div>
-                                <div class="row g-3">
                                     <div class="col-md-6">
                                         <div class="d-flex justify-content-between align-items-center">
                                             <label for="service_level" class="form-label">Service Level</label>
@@ -248,6 +459,8 @@
                                                               data_field="service_level") }}
                                         {% for error in form.service_level.errors %}<div class="invalid-feedback">{{ error }}</div>{% endfor %}
                                     </div>
+                                </div>
+                                <div class="row g-3">
                                     <div class="col-md-6">
                                         <div class="d-flex justify-content-between align-items-center">
                                             <label for="price_level" class="form-label"
@@ -269,9 +482,7 @@
                                                              data_field="price_level") }}
                                         {% for error in form.price_level.errors %}<div class="invalid-feedback">{{ error }}</div>{% endfor %}
                                     </div>
-                                </div>
-                                <div class="row g-3 mt-2">
-                                    <div class="col-md-4">
+                                    <div class="col-md-6">
                                         <div class="d-flex justify-content-between align-items-center">
                                             <label for="rating" class="form-label"
                                                 >Your Rating
@@ -368,7 +579,7 @@
                                                          data_field="city") }}
                                             {% for error in form.city.errors %}<div class="invalid-feedback">{{ error }}</div>{% endfor %}
                                         </div>
-                                        <div class="col-md-3">
+                                        <div class="col-md-6">
                                             <div class="d-flex justify-content-between align-items-center">
                                                 <label for="state" class="form-label">State/Province</label>
                                                 <div class="validation-indicator" id="state-validation-indicator">
@@ -383,9 +594,9 @@
                                                           data_field="state") }}
                                             {% for error in form.state.errors %}<div class="invalid-feedback">{{ error }}</div>{% endfor %}
                                         </div>
-                                        <div class="col-md-3">
+                                        <div class="col-md-4">
                                             <div class="d-flex justify-content-between align-items-center">
-                                                <label for="postal_code" class="form-label">Postal Code</label>
+                                                <label for="postal_code" class="form-label">ZIP / Postal Code</label>
                                                 <div class="validation-indicator" id="postal_code-validation-indicator">
                                                 <small class="text-muted">
                                                     <i class="fas fa-question-circle text-secondary"></i>
@@ -400,7 +611,7 @@
                                                                 data_field="postal_code") }}
                                             {% for error in form.postal_code.errors %}<div class="invalid-feedback">{{ error }}</div>{% endfor %}
                                         </div>
-                                        <div class="col-md-6">
+                                        <div class="col-md-8">
                                             <div class="d-flex justify-content-between align-items-center">
                                                 <label for="country" class="form-label">Country</label>
                                                 <div class="validation-indicator" id="country-validation-indicator">
@@ -417,7 +628,7 @@
                                                              data_field="country") }}
                                             {% for error in form.country.errors %}<div class="invalid-feedback">{{ error }}</div>{% endfor %}
                                         </div>
-                                        <div class="col-md-6">
+                                        <div class="col-12">
                                             <div class="d-flex justify-content-between align-items-center">
                                                 <label for="phone" class="form-label"
                                                     >Phone Number
@@ -483,44 +694,8 @@
                                     </h5>
                                 </div>
                                 <p class="section-intro">Add extra business context and notes when helpful.</p>
-                                <div class="row g-3">
-                                    <div class="col-md-8">
-                                        <label for="located_within" class="form-label">Located Within</label>
-                                        {{ form.located_within(class_="form-control" + (" is-invalid" if form.located_within.errors else ""),
-                                                               placeholder="e.g., mall, airport, hotel",
-                                                               autocomplete="off") }}
-                                        {% for error in form.located_within.errors %}<div class="invalid-feedback">{{ error }}</div>{% endfor %}
-                                    </div>
-                                    <div class="col-md-4 d-flex align-items-end pb-1">
-                                        <div class="form-check form-switch w-100">
-                                            {{ form.is_chain(class_="form-check-input" + (" is-invalid" if form.is_chain.errors else "") ) }}
-                                            <label for="is_chain" class="form-check-label">Is Chain?</label>
-                                            {% for error in form.is_chain.errors %}<div class="invalid-feedback">{{ error }}</div>{% endfor %}
-                                        </div>
-                                    </div>
-                                </div>
                                 {% if current_user.has_advanced_features or current_user.is_admin %}
-                                <div class="row g-3 mt-2">
-                                    <div class="col-md-6">
-                                        <label for="merchant_name" class="form-label">
-                                            Merchant
-                                            <span class="badge bg-info text-dark ms-1">Advanced</span>
-                                        </label>
-                                        <input
-                                            type="text"
-                                            class="form-control"
-                                            id="merchant_name"
-                                            name="merchant_name"
-                                            value="{{ request.form.get('merchant_name', restaurant.merchant.name if restaurant and restaurant.merchant else '') }}"
-                                            placeholder="Start typing a merchant name..."
-                                            autocomplete="off"
-                                            data-merchant-autocomplete
-                                            data-merchant-select="#merchant_id" />
-                                        {{ form.merchant_id(class_="form-select d-none" + (" is-invalid" if form.merchant_id.errors else ""), tabindex="-1", aria_hidden="true") }}
-                                        {% for error in form.merchant_id.errors %}<div class="invalid-feedback">{{ error }}</div>{% endfor %}
-                                        <small class="text-muted">Type to search merchants by name</small>
-                                    </div>
-                                </div>
+                                {# Merchant field moved to Core Restaurant Details section #}
                                 {% endif %}
                                 <div class="row g-3 mt-2">
                                     <div class="col-12">
@@ -594,6 +769,43 @@
                         <label for="quick_add_merchant_short_name" class="form-label">Short Name</label>
                         <input type="text" class="form-control" id="quick_add_merchant_short_name" />
                     </div>
+                    <div class="mb-3">
+                        <label for="quick_add_merchant_service_level" class="form-label">Service Level</label>
+                        <select class="form-select" id="quick_add_merchant_service_level">
+                            <option value="">Select a service level</option>
+                            {% for level in merchant_service_levels %}
+                            <option value="{{ level }}">{{ level.replace('_', ' ')|title }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="quick_add_merchant_cuisine" class="form-label">Cuisine</label>
+                        <select class="form-select" id="quick_add_merchant_cuisine">
+                            <option value="">Select a cuisine</option>
+                            {% for cuisine in merchant_cuisine_choices %}
+                            <option value="{{ cuisine }}">{{ cuisine }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="quick_add_merchant_menu_focus" class="form-label">Menu Focus</label>
+                        <input type="text" class="form-control" id="quick_add_merchant_menu_focus" />
+                    </div>
+                    <div class="mb-3">
+                        <label for="quick_add_merchant_category" class="form-label">Format Category</label>
+                        <select class="form-select" id="quick_add_merchant_category">
+                            <option value="">Select a format category</option>
+                            {% for group in merchant_format_category_groups %}
+                            <optgroup label="{{ group.label }}">
+                                {% for option in group.options %}
+                                <option value="{{ option.value }}">{{ option.label }}</option>
+                                {% endfor %}
+                            </optgroup>
+                            {% endfor %}
+                            <option value="other">Other</option>
+                        </select>
+                        <small class="text-muted">Format describes the physical footprint, not the menu.</small>
+                    </div>
                     <div class="mb-0">
                         <label for="quick_add_merchant_website" class="form-label">Website</label>
                         <input type="url" class="form-control" id="quick_add_merchant_website" placeholder="https://example.com" />
@@ -614,9 +826,11 @@
 {% endblock content %}
 {% block scripts %}
     {{ super() }}
+    <script src="https://cdn.jsdelivr.net/npm/intl-tel-input@25.3.0/build/js/intlTelInput.min.js"></script>
     <!-- Load restaurant autocomplete (does not require client Maps JS) -->
     <script type="module" src="{{ url_for('static', filename='js/components/restaurant-autocomplete.js') }}?v=2.5"></script>
-    <script type="module" src="{{ url_for('static', filename='js/components/merchant-autocomplete.js') }}?v=1.3"></script>
+    <script type="module" src="{{ url_for('static', filename='js/components/merchant-autocomplete.js') }}?v=1.4"></script>
+    <script type="module" src="{{ url_for('static', filename='js/pages/restaurant-display-preview.js') }}?v=1.0"></script>
     <!-- Restaurant form module removed - using simplified autocomplete instead -->
 
     <!-- Restaurant form functionality -->

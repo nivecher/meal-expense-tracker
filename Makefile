@@ -114,6 +114,7 @@ help:  ## Show this help message
 	@echo "  \033[1mmake db-migrate\033[0m      Create new database migration"
 	@echo "  \033[1mmake db-upgrade\033[0m      Upgrade database to latest migration"
 	@echo "  \033[1mmake db-downgrade\033[0m    Downgrade database by one migration"
+	@echo "  \033[1mmake backup-db\033[0m       Create a safe local SQLite snapshot"
 
 	@echo "\n\033[1mDocker:\033[0m"
 	@echo "  \033[1mmake docker-up\033[0m       Start all containers in detached mode"
@@ -244,9 +245,10 @@ format-python: check-env
 
 ## HTML linter
 .PHONY: lint-html
-lint-html: check-npm
+lint-html: check-env check-npm
 	@echo "\n\033[1m=== Running HTML Linter ===\033[0m"
-	@npm run lint-html 2>/dev/null | grep -v "unchanged" || (echo "\033[1;31m❌ HTML linting failed\033[0m"; exit 1)
+	@npm run lint-html 2>/dev/null | grep -v "unchanged" || (echo "\033[1;31m❌ Static HTML linting failed\033[0m"; exit 1)
+	@$(PYTHON) scripts/check_jinja_templates.py || (echo "\033[1;31m❌ Jinja template syntax check failed\033[0m"; exit 1)
 
 ## CSS linter
 .PHONY: lint-css
@@ -1012,6 +1014,11 @@ db-upgrade: check-env
 .PHONY: db-downgrade
 db-downgrade: check-env
 	$(PYTHON) -m flask db downgrade
+
+## Create a safe local SQLite backup
+.PHONY: backup-db
+backup-db:
+	@./scripts/backup_local.sh
 
 ## Setup test user for Playwright tests
 .PHONY: setup-test-user

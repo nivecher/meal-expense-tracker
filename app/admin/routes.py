@@ -1,5 +1,6 @@
 """Admin routes for user management and system administration."""
 
+import json
 import secrets
 import string
 from typing import Any, Dict, Tuple, cast
@@ -7,6 +8,7 @@ from typing import Any, Dict, Tuple, cast
 from flask import (
     Blueprint,
     Response,
+    abort,
     current_app,
     flash,
     jsonify,
@@ -18,6 +20,13 @@ from flask import (
 from flask_login import current_user, login_required
 from sqlalchemy import func
 
+from app.admin.backup_service import (
+    IMPORT_MODE_CREATE_NEW,
+    IMPORT_MODE_REPLACE,
+    IMPORT_MODE_RESTORE,
+    export_user_backup,
+    import_user_backup,
+)
 from app.auth.models import User
 from app.extensions import db
 from app.utils.decorators import admin_required, db_transaction
@@ -208,6 +217,9 @@ def view_user(user_id: int) -> str | Response:
             "expense_count": user.expenses.count() if hasattr(user, "expenses") else 0,
             "restaurant_count": user.restaurants.count() if hasattr(user, "restaurants") else 0,
             "category_count": user.categories.count() if hasattr(user, "categories") else 0,
+            "tag_count": user.tags.count() if hasattr(user, "tags") else 0,
+            "visit_count": user.visits.count() if hasattr(user, "visits") else 0,
+            "receipt_count": user.receipts.count() if hasattr(user, "receipts") else 0,
         }
 
         return render_template(
@@ -221,6 +233,88 @@ def view_user(user_id: int) -> str | Response:
         current_app.logger.error(f"Error loading user {user_id}: {e}")
         flash("Error loading user details", "danger")
         return cast(Response, redirect(url_for("admin.list_users")))
+
+
+@bp.route("/users/<int:user_id>/export")
+@login_required
+@admin_required
+def export_user(user_id: int) -> Response:
+    """Download a full JSON backup for a user."""
+    user = db.session.get(User, user_id)
+    if user is None:
+        abort(404, description="User not found")
+    payload = export_user_backup(user, exported_by=cast(User, current_user))
+    filename = f"user-backup-{user.username}-{user.id}.json"
+
+    return Response(
+        json.dumps(payload, indent=2, sort_keys=True),
+        mimetype="application/json",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+@bp.route("/users/import", methods=["GET", "POST"])
+@login_required
+@admin_required
+@db_transaction(error_message="Failed to import user backup")
+def import_user_route() -> Response:
+    """Import a full user backup from a JSON file."""
+    if request.method == "GET":
+        return cast(Response, render_template("admin/import_user_backup.html", title="Import User Backup"))
+
+    backup_file = request.files.get("backup_file")
+    if backup_file is None or not backup_file.filename:
+        flash("Please choose a backup JSON file to import", "danger")
+        return cast(Response, render_template("admin/import_user_backup.html", title="Import User Backup"))
+
+    import_mode = request.form.get("import_mode", IMPORT_MODE_RESTORE).strip() or IMPORT_MODE_RESTORE
+    new_username = request.form.get("new_username", "").strip() or None
+    new_email = request.form.get("new_email", "").strip() or None
+    create_new_password = request.form.get("new_password", "").strip()
+    preserve_advanced = request.form.get("preserve_advanced_features") == "on"
+    activate_new_user = request.form.get("activate_new_user") == "on"
+    grant_admin = request.form.get("grant_admin") == "on"
+
+    try:
+        payload = json.load(backup_file.stream)
+        if not isinstance(payload, dict):
+            raise ValueError("Backup file must contain a JSON object")
+
+        generated_password: str | None = None
+        import_kwargs: dict[str, Any] = {"mode": import_mode}
+        if import_mode == IMPORT_MODE_CREATE_NEW:
+            generated_password = create_new_password or generate_secure_password()
+            import_kwargs.update(
+                {
+                    "new_username": new_username,
+                    "new_email": new_email,
+                    "new_password_hash": "",
+                    "is_admin": grant_admin,
+                    "is_active": activate_new_user,
+                    "advanced_features_enabled": preserve_advanced,
+                }
+            )
+        imported_user = import_user_backup(payload, **import_kwargs)
+        if import_mode == IMPORT_MODE_CREATE_NEW:
+            imported_user.set_password(generated_password or create_new_password)
+            db.session.add(imported_user)
+    except (json.JSONDecodeError, UnicodeDecodeError, ValueError) as exc:
+        current_app.logger.warning(f"Invalid backup import attempt: {exc}")
+        flash(str(exc), "danger")
+        return cast(Response, render_template("admin/import_user_backup.html", title="Import User Backup"))
+
+    counts = payload.get("counts", {})
+    message = (
+        f"Imported backup for {imported_user.get_display_name()} "
+        f"({counts.get('expenses', 0)} expenses, {counts.get('restaurants', 0)} restaurants, "
+        f"{counts.get('categories', 0)} categories, {counts.get('tags', 0)} tags, "
+        f"{counts.get('visits', 0)} visits, {counts.get('receipts', 0)} receipts)"
+    )
+    if import_mode == IMPORT_MODE_CREATE_NEW:
+        password_to_show = create_new_password or generated_password
+        message = f"{message}. New account username: {imported_user.username}. Password: {password_to_show}"
+    flash(message, "success")
+    return cast(Response, redirect(url_for("admin.view_user", user_id=imported_user.id)))
 
 
 @bp.route("/users/<int:user_id>/reset-password", methods=["POST"])

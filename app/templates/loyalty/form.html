@@ -1,0 +1,231 @@
+{% extends "base.html" %} {% block title %}{% if program %}Edit{% else %}New{% endif %} Rewards Program{% endblock %} {%
+block styles %} {{ super() }}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/intl-tel-input@25.3.0/build/css/intlTelInput.css" />
+<style>
+    .iti {
+        width: 100%;
+    }
+</style>
+{% endblock styles %} {% block content %}
+<div class="container py-4">
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <ul class="nav nav-tabs mb-3" role="tablist">
+                <li class="nav-item" role="presentation">
+                    <a class="nav-link" href="{{ url_for('merchants.list_merchants') }}"
+                        ><i class="fas fa-list me-1"></i>Merchants</a
+                    >
+                </li>
+                <li class="nav-item" role="presentation">
+                    <a class="nav-link" href="{{ url_for('merchants.review_restaurant_associations') }}"
+                        ><i class="fas fa-link me-1"></i>Associations</a
+                    >
+                </li>
+                <li class="nav-item" role="presentation">
+                    <a class="nav-link active" href="{{ url_for('loyalty.list_rewards_programs') }}"
+                        ><i class="fas fa-award me-1"></i>Loyalty</a
+                    >
+                </li>
+            </ul>
+            <div class="card">
+                <div class="card-header bg-white">
+                    <h1 class="h4 mb-0"
+                        ><i class="fas fa-award text-primary me-2"></i>{% if program %}Edit{% else %}New{% endif %}
+                        Rewards Program</h1
+                    >
+                </div>
+                <div class="card-body">
+                    <form
+                        method="post"
+                        data-profile-email="{{ current_user.email or '' }}"
+                        data-profile-phone="{{ current_user.phone or '' }}">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+                        <input type="hidden" name="merchant_id" value="{{ prefill.merchant_id or '' }}" />
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label for="name" class="form-label"
+                                    >Program Name <span class="text-danger">*</span></label
+                                >
+                                <input
+                                    type="text"
+                                    class="form-control"
+                                    id="name"
+                                    name="name"
+                                    value="{{ prefill.name }}"
+                                    required />
+                            </div>
+                            <div class="col-md-6">
+                                <label for="website" class="form-label">Website</label>
+                                <input
+                                    type="url"
+                                    class="form-control"
+                                    id="website"
+                                    name="website"
+                                    value="{{ prefill.website }}" />
+                            </div>
+                            <div class="col-md-6">
+                                <label for="portal_url" class="form-label">Portal URL</label>
+                                <input
+                                    type="url"
+                                    class="form-control"
+                                    id="portal_url"
+                                    name="portal_url"
+                                    value="{{ prefill.portal_url }}" />
+                            </div>
+                            <div class="col-12">
+                                <label for="notes" class="form-label">Program Notes</label>
+                                <textarea class="form-control" id="notes" name="notes" rows="3">
+{{ prefill.notes }}</textarea
+                                >
+                            </div>
+                        </div>
+
+                        <hr class="my-4" />
+
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <h2 class="h5 mb-0">Your Rewards Account</h2>
+                            <div class="d-flex gap-3">
+                                <div class="form-check">
+                                    <input
+                                        class="form-check-input"
+                                        type="checkbox"
+                                        id="use_default_email"
+                                        name="use_default_email"
+                                        {%
+                                        if
+                                        prefill.use_default_email
+                                        %}checked{%
+                                        endif
+                                        %}
+                                        {%
+                                        if
+                                        not
+                                        current_user.email
+                                        %}disabled{%
+                                        endif
+                                        %}
+                                        {%
+                                        if
+                                        not
+                                        current_user.email
+                                        %}title="Set an email address on your profile to use this option."
+                                        {%
+                                        endif
+                                        %} />
+                                    <label
+                                        class="form-check-label{% if not current_user.email %} text-muted{% endif %}"
+                                        for="use_default_email">
+                                        Use my default email
+                                    </label>
+                                </div>
+                                <div class="form-check">
+                                    <input
+                                        class="form-check-input"
+                                        type="checkbox"
+                                        id="use_default_phone"
+                                        name="use_default_phone"
+                                        {%
+                                        if
+                                        prefill.use_default_phone
+                                        %}checked{%
+                                        endif
+                                        %}
+                                        {%
+                                        if
+                                        not
+                                        current_user.phone
+                                        %}disabled{%
+                                        endif
+                                        %}
+                                        {%
+                                        if
+                                        not
+                                        current_user.phone
+                                        %}title="Set a phone number on your profile to use this option."
+                                        {%
+                                        endif
+                                        %} />
+                                    <label
+                                        class="form-check-label{% if not current_user.phone %} text-muted{% endif %}"
+                                        for="use_default_phone">
+                                        Use my default phone
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label for="membership_email" class="form-label">Membership Email</label>
+                                <input
+                                    type="email"
+                                    class="form-control"
+                                    id="membership_email"
+                                    name="membership_email"
+                                    value="{{ prefill.membership_email }}"
+                                    inputmode="email" />
+                            </div>
+                            <div class="col-md-6">
+                                <label for="membership_phone" class="form-label">Membership Phone</label>
+                                <input
+                                    type="tel"
+                                    class="form-control"
+                                    id="membership_phone"
+                                    name="membership_phone"
+                                    value="{{ prefill.membership_phone }}"
+                                    autocomplete="tel" />
+                            </div>
+                            <div class="col-md-4">
+                                <label for="portal_username" class="form-label">Portal Username</label>
+                                <input
+                                    type="text"
+                                    class="form-control"
+                                    id="portal_username"
+                                    name="portal_username"
+                                    value="{{ prefill.portal_username }}" />
+                            </div>
+                            <div class="col-md-4">
+                                <label for="account_number" class="form-label">Account Number</label>
+                                <input
+                                    type="text"
+                                    class="form-control"
+                                    id="account_number"
+                                    name="account_number"
+                                    value="{{ prefill.account_number }}" />
+                            </div>
+                            <div class="col-md-4">
+                                <label for="tier_name" class="form-label">Tier</label>
+                                <input
+                                    type="text"
+                                    class="form-control"
+                                    id="tier_name"
+                                    name="tier_name"
+                                    value="{{ prefill.tier_name }}" />
+                            </div>
+                            <div class="col-12">
+                                <label for="account_notes" class="form-label">Account Notes</label>
+                                <textarea class="form-control" id="account_notes" name="account_notes" rows="3">
+{{ prefill.account_notes }}</textarea
+                                >
+                            </div>
+                        </div>
+
+                        <div class="d-flex justify-content-between mt-4">
+                            <a href="{{ url_for('loyalty.list_rewards_programs') }}" class="btn btn-outline-secondary"
+                                >Cancel</a
+                            >
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-save me-1"></i>{% if program %}Update{% else %}Create{% endif %}
+                                Rewards Program
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} {% block scripts %} {{ super() }}
+<script src="https://cdn.jsdelivr.net/npm/intl-tel-input@25.3.0/build/js/intlTelInput.min.js"></script>
+<script type="module" src="{{ url_for('static', filename='js/pages/loyalty-form.js') }}"></script>
+{% endblock scripts %}

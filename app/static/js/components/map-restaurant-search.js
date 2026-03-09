@@ -71,6 +71,7 @@ export class MapRestaurantSearch {
     this.maxResultsStep = 10;
     this.maxResultsCap = 40;
     this.lastSearchContext = null;
+    this.pendingAddPlaceIds = new Set();
 
     this.init();
   }
@@ -330,6 +331,8 @@ export class MapRestaurantSearch {
             <span class="legend-item"><i class="fas fa-circle text-danger me-1"></i>New places</span>
           </div>
 
+          <section id="selected-result-panel" class="selected-result-panel d-none" aria-live="polite"></section>
+
           <div id="search-results" class="discovery-results-list">
             <div class="discovery-empty text-center text-muted py-5">
               <i class="fas fa-search fa-3x mb-3"></i>
@@ -470,6 +473,11 @@ export class MapRestaurantSearch {
       if (filterButton) {
         const { resultFilter } = filterButton.dataset;
         this.setResultsFilter(resultFilter || 'all');
+      }
+
+      const clearSelectionButton = targetEl.closest('[data-action="clear-selection"]');
+      if (clearSelectionButton) {
+        this.clearSelection();
       }
     });
 
@@ -1062,8 +1070,10 @@ export class MapRestaurantSearch {
     };
     this.resultsFilter = 'all';
     this.selectedResultKey = null;
+    this.selectedRestaurant = null;
     this.updateFilterButtonStates();
     this.updateResultToggleButtons();
+    this.renderSelectedRestaurantPanel();
 
     // Clear existing markers
     this.clearMarkers();
@@ -1079,6 +1089,7 @@ export class MapRestaurantSearch {
       this.updateResultsCount(0, 0);
       this.updateDiagnostics(0, 0);
       this.updateLoadMoreButton(0, false);
+      this.renderSelectedRestaurantPanel();
 
       // Hide location indicator if no results
       locationIndicator.classList.add('d-none');
@@ -1224,7 +1235,9 @@ export class MapRestaurantSearch {
       const hasMoreHint = Boolean(this.currentResults?.meta?.has_more_hint);
       this.updateLoadMoreButton(allResults.length, hasMoreHint);
       this.selectedResultKey = null;
+      this.selectedRestaurant = null;
       this.closeInfoWindow();
+      this.renderSelectedRestaurantPanel();
       return;
     }
 
@@ -1248,7 +1261,9 @@ export class MapRestaurantSearch {
         this.selectRestaurant(selectedIndex, { centerMap: false, scrollCard: false, setZoom: false });
       } else {
         this.selectedResultKey = null;
+        this.selectedRestaurant = null;
         this.closeInfoWindow();
+        this.renderSelectedRestaurantPanel();
       }
     }
 
@@ -1387,6 +1402,9 @@ export class MapRestaurantSearch {
     const matchedRestaurantWebsite = restaurant.matchedRestaurantWebsite || '';
     const faviconWebsite = matchedRestaurantWebsite || website || '';
     const escapedFaviconWebsite = faviconWebsite ? escapeHtml(faviconWebsite) : '';
+    const isSelected = restaurant.resultKey === this.selectedResultKey;
+    const placeId = restaurant.google_place_id || restaurant.place_id || '';
+    const isPendingAdd = this.isPlacePendingAdd(placeId);
 
     // Validate and sanitize URLs
     let safeWebsiteUrl = '';
@@ -1403,7 +1421,7 @@ export class MapRestaurantSearch {
     }
 
     return `
-      <article class="restaurant-card discovery-result-card ${ownershipClass}" data-index="${index}" data-result-key="${escapeHtml(restaurant.resultKey || '')}">
+      <article class="restaurant-card discovery-result-card ${ownershipClass} ${isSelected ? 'is-selected' : ''}" data-index="${index}" data-result-key="${escapeHtml(restaurant.resultKey || '')}">
         <div class="result-rank ${rankClass}">${index + 1}</div>
         <div class="result-media">
           ${
@@ -1453,6 +1471,7 @@ export class MapRestaurantSearch {
 
           <div class="result-badges mb-2">
             <span class="badge result-ownership-badge ${restaurant.isMine ? 'text-bg-primary' : 'text-bg-danger'}">${ownershipLabel}</span>
+            ${isSelected ? '<span class="badge text-bg-warning">Selected</span>' : ''}
             ${priceLevel > 0 ? `<span class="badge text-bg-light">${'$'.repeat(priceLevel)}</span>` : ''}
             ${openingStatus.badge ? `<span class="badge ${openingStatus.class}">${escapedOpeningStatusText}</span>` : ''}
             ${openingStatus.hoursText ? `<span class="badge text-bg-light">${escapeHtml(openingStatus.hoursText)}</span>` : ''}
@@ -1485,14 +1504,20 @@ export class MapRestaurantSearch {
                   <i class="fas fa-arrow-up-right-from-square me-1"></i>View in My Restaurants
                 </a>
               `
-    : (restaurant.google_place_id && restaurant.google_place_id.trim() !== '') ||
-                      (restaurant.place_id && restaurant.place_id.trim() !== '')
+    : isPendingAdd
       ? `
-                <button class="btn btn-primary btn-sm" data-place-id="${restaurant.google_place_id || restaurant.place_id}" data-action="add-restaurant">
+                <button class="btn btn-primary btn-sm" disabled>
+                  <i class="fas fa-spinner fa-spin me-1"></i>Adding...
+                </button>
+              `
+      : (restaurant.google_place_id && restaurant.google_place_id.trim() !== '') ||
+                        (restaurant.place_id && restaurant.place_id.trim() !== '')
+        ? `
+                <button class="btn btn-primary btn-sm" data-place-id="${placeId}" data-action="add-restaurant">
                   <i class="fas fa-plus me-1"></i>Add
                 </button>
               `
-      : `
+        : `
                 <button class="btn btn-outline-secondary btn-sm" disabled title="This restaurant is missing a Google Place ID.">
                   <i class="fas fa-ban me-1"></i>Unavailable
                 </button>
@@ -1706,7 +1731,11 @@ export class MapRestaurantSearch {
           <span class="badge rounded-pill ${ownershipClass}">${ownershipText}</span>
           ${safeCuisine ? `<span class="badge rounded-pill text-bg-light">${safeCuisine}</span>` : ''}
         </div>
-        ${restaurant.isMine && restaurant.matchedRestaurantId ? `<a href="${viewUrl}" class="small text-decoration-none">View in My Restaurants</a>` : '<span class="small text-muted">Add from the list to save</span>'}
+        ${
+  restaurant.isMine && restaurant.matchedRestaurantId
+    ? `<a href="${viewUrl}" class="small text-decoration-none">View in My Restaurants</a>`
+    : '<span class="small text-muted">Use the selected place panel below the filters to save this spot.</span>'
+}
       </div>
     `);
     this.activeInfoWindow.open({ map: this.map, anchor: marker });
@@ -1736,8 +1765,8 @@ export class MapRestaurantSearch {
     if (card) {
       // Use requestAnimationFrame to batch DOM writes
       requestAnimationFrame(() => {
-        card.classList.add('border-primary', 'shadow-lg');
-        card.style.transform = 'scale(1.02)';
+        card.classList.add('border-primary', 'shadow-lg', 'is-selected');
+        card.style.transform = 'scale(1.01)';
         card.style.transition = 'all 0.2s ease';
 
         // Scroll to selected card
@@ -1753,7 +1782,7 @@ export class MapRestaurantSearch {
 
     this.container.querySelectorAll('.restaurant-card').forEach((otherCard) => {
       if (otherCard !== card) {
-        otherCard.classList.remove('border-primary', 'shadow-lg');
+        otherCard.classList.remove('border-primary', 'shadow-lg', 'is-selected');
         otherCard.style.transform = 'scale(1)';
       }
     });
@@ -1784,13 +1813,14 @@ export class MapRestaurantSearch {
     this.openInfoWindow(restaurant, markerEntry.marker);
 
     this.selectedRestaurant = restaurant;
+    this.renderSelectedRestaurantPanel();
     this.options.onSelect(restaurant);
   }
 
   clearSelection() {
     // Clear card selection
     this.container.querySelectorAll('.restaurant-card').forEach((card) => {
-      card.classList.remove('border-primary', 'shadow-lg');
+      card.classList.remove('border-primary', 'shadow-lg', 'is-selected');
       card.style.transform = 'scale(1)';
     });
 
@@ -1804,6 +1834,7 @@ export class MapRestaurantSearch {
     this.selectedRestaurant = null;
     this.selectedResultKey = null;
     this.closeInfoWindow();
+    this.renderSelectedRestaurantPanel();
   }
 
   clearMarkers() {
@@ -2015,6 +2046,101 @@ export class MapRestaurantSearch {
     `;
   }
 
+  isPlacePendingAdd(placeId) {
+    const normalizedPlaceId = this.normalizePlaceId(placeId);
+    return normalizedPlaceId ? this.pendingAddPlaceIds.has(normalizedPlaceId) : false;
+  }
+
+  getSelectedVisibleRestaurant() {
+    if (!this.selectedResultKey || !Array.isArray(this.visibleResults)) {
+      return null;
+    }
+
+    return this.visibleResults.find((restaurant) => restaurant.resultKey === this.selectedResultKey) || null;
+  }
+
+  renderSelectedRestaurantPanel() {
+    const panel = this.container.querySelector('#selected-result-panel');
+    if (!panel) {
+      return;
+    }
+
+    const restaurant = this.getSelectedVisibleRestaurant() || this.selectedRestaurant;
+    if (!restaurant) {
+      panel.classList.add('d-none');
+      panel.innerHTML = '';
+      return;
+    }
+
+    const address = this.parseAddress(restaurant);
+    const distanceText = restaurant.distanceText ? escapeHtml(restaurant.distanceText) : '';
+    const priceLevel = Number(restaurant.price_level || 0);
+    const ownershipLabel = restaurant.isMine ? 'Saved in My Restaurants' : 'Not saved yet';
+    const ownershipClass = restaurant.isMine ? 'text-bg-primary' : 'text-bg-danger';
+    const placeId = restaurant.google_place_id || restaurant.place_id || '';
+    const isPendingAdd = this.isPlacePendingAdd(placeId);
+    const safeName = escapeHtml(restaurant.name || 'Restaurant');
+    const safeStreet = escapeHtml(address.street || 'Address unavailable');
+    const safeCityStateZip = address.cityStateZip ? escapeHtml(address.cityStateZip) : '';
+    const safeCuisine = escapeHtml(restaurant.cuisine_type || restaurant.cuisine || '');
+    const safeViewUrl = restaurant.matchedRestaurantId ? `/restaurants/${restaurant.matchedRestaurantId}` : '#';
+
+    let primaryAction = `
+      <button class="btn btn-outline-secondary btn-sm" disabled title="This restaurant is missing a Google Place ID.">
+        <i class="fas fa-ban me-1"></i>Cannot Add
+      </button>
+    `;
+    if (restaurant.isMine && restaurant.matchedRestaurantId) {
+      primaryAction = `
+        <a href="${safeViewUrl}" class="btn btn-primary btn-sm">
+          <i class="fas fa-arrow-up-right-from-square me-1"></i>Open Restaurant
+        </a>
+      `;
+    } else if (isPendingAdd) {
+      primaryAction = `
+        <button class="btn btn-primary btn-sm" disabled>
+          <i class="fas fa-spinner fa-spin me-1"></i>Adding...
+        </button>
+      `;
+    } else if (placeId && placeId.trim() !== '') {
+      primaryAction = `
+        <button class="btn btn-primary btn-sm" data-place-id="${escapeHtml(placeId)}" data-action="add-restaurant">
+          <i class="fas fa-plus me-1"></i>Add to My Restaurants
+        </button>
+      `;
+    }
+
+    panel.classList.remove('d-none');
+    panel.innerHTML = `
+      <div class="selected-result-shell">
+        <div class="selected-result-copy">
+          <div class="selected-result-kicker">Selected place</div>
+          <div class="d-flex flex-wrap align-items-start justify-content-between gap-2">
+            <div>
+              <h5 class="selected-result-title mb-1">${safeName}</h5>
+              <div class="selected-result-address">
+                <div>${safeStreet}</div>
+                ${safeCityStateZip ? `<div>${safeCityStateZip}</div>` : ''}
+              </div>
+            </div>
+            ${distanceText ? `<div class="selected-result-distance">${distanceText} away</div>` : ''}
+          </div>
+          <div class="selected-result-badges">
+            <span class="badge ${ownershipClass}">${ownershipLabel}</span>
+            ${safeCuisine ? `<span class="badge text-bg-light">${safeCuisine}</span>` : ''}
+            ${priceLevel > 0 ? `<span class="badge text-bg-light">${'$'.repeat(priceLevel)}</span>` : ''}
+          </div>
+        </div>
+        <div class="selected-result-actions">
+          ${primaryAction}
+          <button class="btn btn-outline-secondary btn-sm" type="button" data-action="clear-selection">
+            <i class="fas fa-xmark me-1"></i>Clear
+          </button>
+        </div>
+      </div>
+    `;
+  }
+
   applyOptimisticOwnership(placeId) {
     if (!placeId || !this.currentResults?.results?.length) {
       return;
@@ -2052,6 +2178,12 @@ export class MapRestaurantSearch {
     }
 
     try {
+      const normalizedPlaceId = this.normalizePlaceId(placeId);
+      if (normalizedPlaceId) {
+        this.pendingAddPlaceIds.add(normalizedPlaceId);
+        this.renderVisibleResults({ fitMap: false });
+      }
+
       const addResult = await window.addToMyRestaurants(placeId);
       const wasAdded = Boolean(addResult?.success);
       const alreadyExists = Boolean(addResult?.exists);
@@ -2075,6 +2207,12 @@ export class MapRestaurantSearch {
       }
     } catch {
       // add handler already surfaced a toast message
+    } finally {
+      const normalizedPlaceId = this.normalizePlaceId(placeId);
+      if (normalizedPlaceId) {
+        this.pendingAddPlaceIds.delete(normalizedPlaceId);
+        this.renderVisibleResults({ fitMap: false });
+      }
     }
   }
 }

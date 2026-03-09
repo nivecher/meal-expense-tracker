@@ -120,9 +120,12 @@ url_for('expenses.list_expenses'), 'title': 'Expenses'}, {'title': 'Expense Deta
                         </div>
                         <!-- Date -->
                         <div class="text-muted small">
-                            <i class="fas fa-calendar me-1"></i>{{ expense.date|format_date_user_tz("%B %d, %Y") }} {%
+                            <i class="fas fa-calendar me-1"></i>Visit {{ expense.date|format_date_user_tz("%B %d, %Y") }} {%
                             if timezone_display %} <br /><i class="fas fa-clock me-1"></i>{{
                             expense.date|format_time_with_tz }} {% endif %}
+                            {% if expense.cleared_date %}
+                            <br /><i class="fas fa-check-circle me-1"></i>Cleared {{ expense.cleared_date.strftime("%B %d, %Y") }}
+                            {% endif %}
                         </div>
                     </div>
                 </div>
@@ -271,12 +274,12 @@ url_for('expenses.list_expenses'), 'title': 'Expenses'}, {'title': 'Expense Deta
                             </div>
                         </div>
 
-                        {% if expense.receipt_image %}
+                        {% if expense.receipt_storage_path %}
                         <div class="col-12 col-md-6">
                             <label class="form-label text-muted small">Receipt</label>
                             <div>
                                 <a
-                                    href="{{ get_receipt_url(expense.receipt_image) }}"
+                                    href="{{ get_receipt_url(expense.receipt_storage_path) }}"
                                     class="btn btn-outline-primary btn-sm">
                                     <i class="fas fa-receipt me-1"></i>View Receipt
                                 </a>

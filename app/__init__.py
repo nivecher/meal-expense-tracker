@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 from flask import Flask, Response, current_app, request
 from flask_cors import CORS
 
-from config import get_config
+from config import Config, get_config
 
 # Initialize logger
 logger = logging.getLogger(__name__)
@@ -22,17 +22,21 @@ except PermissionError:
 __all__ = ["create_app"]
 
 
-def create_app(config_name: str | None = None) -> Flask:
+def create_app(config_name: str | type[Config] | None = None) -> Flask:
     """Create and configure the Flask application.
 
     Args:
-        config_name: This parameter is kept for backward compatibility but not used.
-                    The configuration is determined by FLASK_ENV environment variable.
+        config_name: Optional environment name or config class override.
     Returns:
         Flask: The configured Flask application instance.
     """
-    # Get the appropriate configuration based on FLASK_ENV
-    config = get_config()
+    # Respect explicit app factory overrides before falling back to FLASK_ENV.
+    if isinstance(config_name, type):
+        config = config_name() if issubclass(config_name, Config) else get_config()
+    elif isinstance(config_name, str) and config_name.strip():
+        config = get_config(config_name.strip())
+    else:
+        config = get_config()
 
     # Create the Flask application
     app = Flask(__name__)
@@ -256,7 +260,7 @@ def _configure_logging(app: Flask) -> None:
 def _initialize_components(app: Flask) -> None:
     """Initialize core application components."""
     # Import all models to ensure they're registered with SQLAlchemy
-    from . import merchants, receipts, visits
+    from . import loyalty, merchants, receipts, visits
 
     # Initialize all extensions
     from .database import init_database
@@ -320,10 +324,12 @@ def _initialize_admin_and_cli(app: Flask) -> None:
     # Initialize CLI commands
     from .auth.cli import register_commands as register_auth_commands
     from .expenses.cli import register_commands as register_expenses_commands
+    from .merchants.cli import register_commands as register_merchant_commands
     from .restaurants.cli import register_commands as register_restaurant_commands
 
     register_auth_commands(app)
     register_expenses_commands(app)
+    register_merchant_commands(app)
     register_restaurant_commands(app)
     from app.cli.db_commands import register_commands as register_db_commands
 
@@ -354,6 +360,7 @@ def _register_blueprints(app: Flask) -> None:
         ("api", "/api/v1"),
         ("reports", "/reports"),
         ("health", "/health"),
+        ("loyalty", None),
     ]
 
     # Register merchants blueprint (has built-in URL prefix)
@@ -368,8 +375,12 @@ def _register_blueprints(app: Flask) -> None:
         try:
             module = __import__(f"app.{module_name}", fromlist=["bp"])
             bp = module.bp
-            app.register_blueprint(bp, url_prefix=url_prefix)
-            logger.debug(f"Registered blueprint: {bp.name} at {url_prefix}")
+            if url_prefix is None:
+                app.register_blueprint(bp)
+                logger.debug(f"Registered blueprint: {bp.name} at built-in prefix")
+            else:
+                app.register_blueprint(bp, url_prefix=url_prefix)
+                logger.debug(f"Registered blueprint: {bp.name} at {url_prefix}")
         except ImportError as e:
             logger.warning(f"Could not import {module_name} blueprint: {e}")
 

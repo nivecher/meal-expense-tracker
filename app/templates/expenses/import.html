@@ -1,4 +1,26 @@
-{% extends "base.html" %} {% block title %} Import Expenses {% endblock title %} {% block content %}
+{% extends "base.html" %} {% block title %} Import Expenses {% endblock title %} {% block main_container_class
+%}container-fluid{% endblock %} {% block styles %} {{ super() }}
+<link href="{{ url_for('static', filename='css/pages/expense-list.css') }}" rel="stylesheet" />
+{% endblock styles %} {% block section_header %}
+<div class="section-header-expenses">
+    <div class="section-title">
+        <i class="fas fa-receipt text-primary"></i>
+        <h1>Expenses</h1>
+    </div>
+    <ul class="nav nav-tabs section-tabs expenses-page-tabs mt-2" role="tablist">
+        <li class="nav-item" role="presentation">
+            <a class="nav-link" href="{{ url_for('expenses.list_expenses') }}">
+                <i class="fas fa-list me-1"></i>Expenses
+            </a>
+        </li>
+        <li class="nav-item" role="presentation">
+            <a class="nav-link active" href="{{ url_for('expenses.import_expenses') }}">
+                <i class="fas fa-file-import me-1"></i>Import
+            </a>
+        </li>
+    </ul>
+</div>
+{% endblock %} {% block content %}
 <div class="container mt-4">
     <div class="row justify-content-center">
         <div class="col-md-8">
@@ -23,6 +45,15 @@
                             <strong>Upload a CSV or JSON file with expense data.</strong>
                             Required: <code>date</code> and <code>amount</code> columns. Optional: restaurant, category,
                             meal type, notes, tags.
+                        </div>
+
+                        <div class="alert alert-warning">
+                            <i class="fas fa-route me-2"></i>
+                            <strong>Planned Simplifi review flow:</strong>
+                            The maintained design direction is a row-by-row import review for Quicken Simplifi exports.
+                            Planned matching will use exact absolute amount, a 1-3 day date window, and payee to
+                            restaurant name/display-name comparison. Each row is intended to support explicit actions to
+                            match an existing restaurant, create a restaurant, or skip.
                         </div>
 
                         <!-- Expandable Sections -->
@@ -130,11 +161,12 @@
                                             <div class="col-md-6">
                                                 <h6>Flexible Column Names</h6>
                                                 <small class="text-muted">
-                                                    <strong>Date:</strong> postedOn, transaction_date, expense_date<br />
-                                                    <strong>Amount:</strong> cost, price, total, value<br />
+                                                    <strong>Date:</strong> Date, postedOn, transaction_date,
+                                                    expense_date<br />
+                                                    <strong>Amount:</strong> Amount, cost, price, total, value<br />
                                                     <strong>Restaurant:</strong> payee, vendor, merchant, location<br />
-                                                    <strong>Category:</strong> usage_category, type<br />
-                                                    <strong>Notes:</strong> description, memo, comment<br />
+                                                    <strong>Category:</strong> Category, usage_category, type<br />
+                                                    <strong>Notes:</strong> Notes, description, memo, comment<br />
                                                     <strong>Tags:</strong> tags, label, labels
                                                 </small>
                                             </div>
@@ -143,8 +175,8 @@
                                                 <small class="text-muted">
                                                     • Multiple date formats (ISO, US, European, Excel)<br />
                                                     • Currency symbols and thousands separators<br />
-                                                    • Duplicate detection and prevention<br />
-                                                    • Restaurant matching and disambiguation<br />
+                                                    • Planned guided duplicate review for bank-style imports<br />
+                                                    • Planned restaurant matching, create, and skip decisions<br />
                                                     • Hierarchical category mapping<br />
                                                     • Tag matching with auto-create
                                                 </small>
@@ -179,12 +211,14 @@
                                                 <h6>Valid Date Formats</h6>
                                                 <code class="d-block">2025-09-15</code>
                                                 <code class="d-block">9/15/2025</code>
+                                                <code class="d-block">7-Mar-26</code>
                                                 <code class="d-block">45230 (Excel serial)</code>
                                             </div>
                                             <div class="col-md-6">
                                                 <h6>Valid Amount Formats</h6>
                                                 <code class="d-block">24.77 (expense)</code>
                                                 <code class="d-block">($15.50) (expense)</code>
+                                                <code class="d-block">-37.75 (bank export expense)</code>
                                                 <code class="d-block">+$76.89 (reimbursement)</code>
                                             </div>
                                         </div>

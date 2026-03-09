@@ -1,5 +1,7 @@
 """Tests for blueprint registration and initialization."""
 
+from app import create_app
+
 
 def test_blueprint_registration(app) -> None:
     """Test that all blueprints are properly registered."""
@@ -19,6 +21,7 @@ def test_blueprint_registration(app) -> None:
         "admin",
         "errors",
         "health",
+        "loyalty",
     }
 
     # Debug routes are part of the main blueprint, not a separate debug blueprint
@@ -73,3 +76,11 @@ def test_blueprint_initialization(app) -> None:
         assert "restaurants" in app.blueprints, "Restaurants blueprint not registered"
         assert "api" in app.blueprints, "API blueprint not registered"
         assert "reports" in app.blueprints, "Reports blueprint not registered"
+
+
+def test_create_app_string_override_uses_testing_config() -> None:
+    """Test that create_app('testing') does not fall back to development config."""
+    app = create_app("testing")
+    with app.app_context():
+        assert app.config["TESTING"] is True
+        assert app.config["SQLALCHEMY_DATABASE_URI"] == "sqlite:///:memory:"

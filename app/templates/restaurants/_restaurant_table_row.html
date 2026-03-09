@@ -93,8 +93,9 @@
         {% endif %}
     </td>
     <td class="fw-bold text-info amount-right">
-        {% if restaurant.avg_price_per_person and restaurant.avg_price_per_person > 0 %} ${{ {{
-        restaurant.avg_price_per_person|format_currency_usd }} {% else %}
+        {% if restaurant.avg_price_per_person and restaurant.avg_price_per_person > 0 %}
+        {{ restaurant.avg_price_per_person|format_currency_usd }}
+        {% else %}
         <span class="text-muted">-</span>
         {% endif %}
     </td>

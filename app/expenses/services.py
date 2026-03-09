@@ -1,17 +1,20 @@
 """Service functions for the expenses blueprint."""
 
+from collections import defaultdict
 import csv
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, time, timedelta, timezone
 from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 import io
 import json
+from pathlib import Path
 import re
 from typing import Any, Dict, List, Optional, Tuple, Union, cast
 
-from flask import Request, current_app
+from flask import Request, current_app, url_for
 from flask_wtf import FlaskForm
 from sqlalchemy import extract, func, or_, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import joinedload
 from sqlalchemy.sql import Select
 from werkzeug.datastructures import FileStorage
@@ -20,6 +23,7 @@ from app.constants.categories import get_default_categories
 from app.expenses.forms import ExpenseForm
 from app.expenses.models import Category, Expense, ExpenseTag, Tag
 from app.extensions import db
+from app.receipts.models import Receipt
 from app.restaurants.models import Restaurant
 from app.utils.timezone_utils import get_timezone
 
@@ -79,7 +83,10 @@ def get_user_expenses(user_id: int, filters: dict[str, Any]) -> tuple[list[Expen
     # Base query with eager loading of tags
     stmt = (
         select(Expense)
-        .options(joinedload(Expense.expense_tags).joinedload(ExpenseTag.tag))
+        .options(
+            joinedload(Expense.expense_tags).joinedload(ExpenseTag.tag),
+            joinedload(Expense.receipt),
+        )
         .where(Expense.user_id == user_id)
     )
 
@@ -112,6 +119,108 @@ def get_user_expenses(user_id: int, filters: dict[str, Any]) -> tuple[list[Expen
     )
 
     return expenses_list, total_amount, avg_price_per_person
+
+
+def _get_expense_aggregates(user_id: int, filters: dict[str, Any]) -> tuple[float, float | None]:
+    """Get total amount and average price per person over the filtered expense set.
+
+    Args:
+        user_id: The ID of the user
+        filters: Dictionary of filter parameters (same as apply_filters)
+
+    Returns:
+        Tuple of (total_amount, avg_price_per_person)
+    """
+    stmt = select(Expense).where(Expense.user_id == user_id)
+    stmt = apply_filters(stmt, filters)
+    count_stmt = select(func.count()).select_from(stmt.subquery())
+    total_count = db.session.execute(count_stmt).scalar_one() or 0
+    if total_count == 0:
+        return 0.0, None
+
+    sum_stmt = select(func.coalesce(func.sum(Expense.amount), 0)).where(Expense.user_id == user_id)
+    sum_stmt = apply_filters(sum_stmt, filters)
+    total_amount = float(db.session.execute(sum_stmt).scalar_one() or 0)
+
+    # Avg price per person: average of (amount/party_size) for expenses with party_size > 0
+    avg_stmt = (
+        select(func.avg(Expense.amount / func.nullif(Expense.party_size, 0)))
+        .where(Expense.user_id == user_id)
+        .where(Expense.party_size.isnot(None))
+        .where(Expense.party_size > 0)
+    )
+    avg_stmt = apply_filters(avg_stmt, filters)
+    avg_result = db.session.execute(avg_stmt).scalar_one()
+    avg_price_per_person = float(avg_result) if avg_result is not None else None
+    return total_amount, avg_price_per_person
+
+
+def get_user_expenses_paginated(
+    user_id: int,
+    filters: dict[str, Any],
+    offset: int = 0,
+    limit: int = 25,
+) -> tuple[list[Expense], int, float, float | None]:
+    """Get a page of expenses for a user with the given filters (SQL-level pagination).
+
+    Args:
+        user_id: The ID of the user
+        filters: Dictionary of filter parameters
+        offset: Number of rows to skip
+        limit: Maximum number of rows to return
+
+    Returns:
+        Tuple of (expenses_page, total_count, total_amount, avg_price_per_person)
+    """
+    stmt = (
+        select(Expense)
+        .options(
+            joinedload(Expense.expense_tags).joinedload(ExpenseTag.tag),
+            joinedload(Expense.receipt),
+        )
+        .where(Expense.user_id == user_id)
+    )
+    stmt = apply_filters(stmt, filters)
+    stmt = apply_sorting(stmt, filters["sort_by"], filters["sort_order"])
+
+    count_stmt = select(func.count()).select_from(stmt.subquery())
+    total_count = db.session.execute(count_stmt).scalar_one() or 0
+
+    total_amount, avg_price_per_person = _get_expense_aggregates(user_id, filters)
+
+    stmt = stmt.limit(limit).offset(offset)
+    result = db.session.execute(stmt)
+    expenses_page = list(result.scalars().unique().all())
+
+    return expenses_page, total_count, total_amount, avg_price_per_person
+
+
+# Maximum number of expenses to load for calendar JSON (avoids huge payloads)
+CALENDAR_EXPENSES_LIMIT = 500
+
+
+def get_calendar_expenses(
+    user_id: int,
+    filters: dict[str, Any],
+    limit: int = CALENDAR_EXPENSES_LIMIT,
+) -> list[Expense]:
+    """Get a limited set of expenses for calendar view JSON (same filters, no full scan).
+
+    Args:
+        user_id: The ID of the user
+        filters: Dictionary of filter parameters
+        limit: Maximum number of expenses to return (default 500)
+
+    Returns:
+        List of Expense objects (most recent first by date)
+    """
+    stmt = select(Expense).options(joinedload(Expense.restaurant)).where(Expense.user_id == user_id)
+    stmt = apply_filters(stmt, filters)
+    # Calendar: sort by date desc so we get most recent
+    stmt = apply_sorting(stmt, "date", "desc")
+    stmt = stmt.limit(limit)
+    result = db.session.execute(stmt)
+    return list(result.scalars().unique().all())
 
 
 def _parse_filter_date_value(date_value: str | None) -> date | None:
@@ -285,6 +394,191 @@ def get_main_filter_options(user_id: int) -> dict[str, list[str]]:
     }
 
 
+def _normalize_receipt_storage_path(storage_path: str | None) -> str | None:
+    """Normalize receipt storage references for reconciliation."""
+    if not storage_path:
+        return None
+    normalized = storage_path.strip()
+    return normalized or None
+
+
+def _detect_receipt_storage_backend(storage_path: str) -> str:
+    """Infer the storage backend for a receipt reference."""
+    s3_prefix = current_app.config.get("S3_RECEIPTS_PREFIX", "receipts/")
+    normalized_path = storage_path.lower()
+    if normalized_path.startswith("s3://"):
+        return "s3"
+    if s3_prefix and storage_path.startswith(s3_prefix):
+        return "s3"
+    if normalized_path.startswith(("http://", "https://")):
+        return "remote"
+    return "local"
+
+
+def _resolve_local_receipt_path(storage_path: str) -> Path | None:
+    """Resolve a local receipt reference to a filesystem path."""
+    upload_folder = current_app.config.get("UPLOAD_FOLDER")
+    if not upload_folder:
+        return None
+    filename = Path(storage_path).name
+    if not filename:
+        return None
+    return Path(upload_folder) / filename
+
+
+def get_receipt_reconciliation(user_id: int) -> tuple[list[dict[str, Any]], dict[str, int]]:
+    """Build a reconciliation view across receipt storage, receipt rows, and expenses."""
+    expense_stmt = (
+        select(Expense)
+        .options(joinedload(Expense.restaurant))
+        .where(Expense.user_id == user_id)
+        .where(Expense.receipt_image.is_not(None))
+        .order_by(Expense.date.desc(), Expense.id.desc())
+    )
+    receipt_stmt = (
+        select(Receipt)
+        .options(joinedload(Receipt.expense).joinedload(Expense.restaurant))
+        .where(Receipt.user_id == user_id)
+        .order_by(Receipt.created_at.desc(), Receipt.id.desc())
+    )
+
+    expense_refs = list(db.session.execute(expense_stmt).scalars().all())
+    receipt_rows = list(db.session.execute(receipt_stmt).scalars().unique().all())
+
+    grouped_refs: dict[str, dict[str, Any]] = defaultdict(lambda: {"expenses": [], "receipts": []})
+
+    for expense in expense_refs:
+        storage_path = _normalize_receipt_storage_path(expense.receipt_image)
+        if storage_path:
+            grouped_refs[storage_path]["expenses"].append(expense)
+
+    for receipt in receipt_rows:
+        storage_path = _normalize_receipt_storage_path(receipt.file_uri)
+        if storage_path:
+            grouped_refs[storage_path]["receipts"].append(receipt)
+
+    summary = {
+        "total_receipts": 0,
+        "reconciled": 0,
+        "missing_receipt_row": 0,
+        "missing_expense": 0,
+        "review_required": 0,
+        "local_missing": 0,
+        "s3_backed": 0,
+        "local_backed": 0,
+    }
+    rows: list[dict[str, Any]] = []
+
+    for storage_path, grouped in grouped_refs.items():
+        storage_backend = _detect_receipt_storage_backend(storage_path)
+        local_file_path = _resolve_local_receipt_path(storage_path) if storage_backend == "local" else None
+        storage_exists = local_file_path.exists() if local_file_path else None
+
+        expense_ids_from_image = {expense.id for expense in grouped["expenses"]}
+        linked_expenses_by_id: dict[int, Expense] = {expense.id: expense for expense in grouped["expenses"]}
+        receipt_rows_for_storage: list[Receipt] = grouped["receipts"]
+        receipt_expense_ids: set[int] = set()
+        linkage_mismatches: list[str] = []
+
+        for receipt in receipt_rows_for_storage:
+            linked_expense = receipt.expense
+            if linked_expense is None:
+                continue
+            linked_expenses_by_id[linked_expense.id] = linked_expense
+            receipt_expense_ids.add(linked_expense.id)
+
+            linked_expense_path = _normalize_receipt_storage_path(linked_expense.receipt_image)
+            if linked_expense_path and linked_expense_path != storage_path:
+                linkage_mismatches.append(
+                    f"Expense #{linked_expense.id} points to {linked_expense_path} instead of {storage_path}."
+                )
+
+        linked_expenses = sorted(
+            linked_expenses_by_id.values(),
+            key=lambda expense: (
+                expense.date if expense.date is not None else datetime.min.replace(tzinfo=UTC),
+                expense.id,
+            ),
+            reverse=True,
+        )
+
+        issues: list[str] = []
+        if not receipt_rows_for_storage:
+            issues.append("Missing receipt DB row")
+        if not linked_expenses:
+            issues.append("Missing linked expense")
+        if any(receipt.expense_id is None for receipt in receipt_rows_for_storage):
+            issues.append("Receipt row is not linked directly to an expense")
+        if len(receipt_rows_for_storage) > 1:
+            issues.append("Multiple receipt rows reference the same image")
+        if len(linked_expenses) > 1:
+            issues.append("Multiple expenses reference the same receipt image")
+        if expense_ids_from_image and receipt_expense_ids and expense_ids_from_image != receipt_expense_ids:
+            issues.append("Receipt row and expense image links do not match")
+        issues.extend(linkage_mismatches)
+        if storage_backend == "local" and storage_exists is False:
+            issues.append("Local receipt file is missing from storage")
+
+        if not receipt_rows_for_storage:
+            status = "missing_receipt_row"
+        elif not linked_expenses:
+            status = "missing_expense"
+        elif issues:
+            status = "review_required"
+        else:
+            status = "reconciled"
+
+        summary["total_receipts"] += 1
+        summary[status] += 1
+        if storage_backend == "local":
+            summary["local_backed"] += 1
+            if storage_exists is False:
+                summary["local_missing"] += 1
+        elif storage_backend == "s3":
+            summary["s3_backed"] += 1
+
+        last_updated_candidates = [
+            timestamp
+            for timestamp in [
+                *[expense.updated_at or expense.created_at for expense in linked_expenses],
+                *[receipt.updated_at or receipt.created_at for receipt in receipt_rows_for_storage],
+            ]
+            if timestamp is not None
+        ]
+
+        rows.append(
+            {
+                "storage_path": storage_path,
+                "storage_backend": storage_backend,
+                "storage_exists": storage_exists,
+                "local_file_path": str(local_file_path) if local_file_path else None,
+                "receipt_rows": receipt_rows_for_storage,
+                "receipt_row_ids": [receipt.id for receipt in receipt_rows_for_storage],
+                "linked_expenses": linked_expenses,
+                "linked_expense_ids": [expense.id for expense in linked_expenses],
+                "status": status,
+                "issues": issues,
+                "has_ocr_data": any(receipt.has_ocr_data for receipt in receipt_rows_for_storage),
+                "last_updated_at": max(last_updated_candidates) if last_updated_candidates else None,
+            }
+        )
+
+    status_rank = {
+        "review_required": 0,
+        "missing_receipt_row": 1,
+        "missing_expense": 2,
+        "reconciled": 3,
+    }
+    rows.sort(
+        key=lambda row: (
+            status_rank.get(row["status"], 99),
+            row["last_updated_at"] if row["last_updated_at"] is not None else datetime.min.replace(tzinfo=UTC),
+        )
+    )
+
+    return rows, summary
+
+
 # =============================================================================
 # EXISTING FUNCTIONALITY
 # =============================================================================
@@ -332,7 +626,7 @@ def prepare_expense_form(
     restaurants: list[Restaurant] = Restaurant.query.filter_by(user_id=user_id).order_by(Restaurant.name).all()
 
     form.category_id.choices = [(None, "Select a category (optional)")] + [(c.id, c.name) for c in categories]
-    form.restaurant_id.choices = [(None, "Select a restaurant")] + [(r.id, r.name) for r in restaurants]
+    form.restaurant_id.choices = [(None, "Select a restaurant")] + [(r.id, r.display_name) for r in restaurants]
 
     if not form.date.data:
         form.date.data = datetime.now(UTC).date()
@@ -400,6 +694,13 @@ def _process_time(time_value: Any) -> tuple[time | None, str | None]:
     except (ValueError, TypeError, AttributeError) as e:
         current_app.logger.error("Invalid time: %s. Error: %s", time_value, e)
         return None, "Invalid time format. Please use HH:MM format."
+
+
+def _process_optional_date(date_value: Any) -> tuple[date | None, str | None]:
+    """Process an optional date from form data."""
+    if not date_value:
+        return None, None
+    return _process_date(date_value)
 
 
 def _process_amount(amount_value: Any) -> tuple[Decimal | None, str | None]:
@@ -535,6 +836,66 @@ def _add_tags_to_expense(expense_id: int, user_id: int, tags: list[str]) -> None
         current_app.logger.warning(f"Failed to add tags to expense {expense_id}: {str(e)}")
 
 
+def _infer_receipt_type(storage_path: str) -> str:
+    """Infer receipt type from the storage path extension."""
+    suffix = Path(storage_path).suffix.lower()
+    if suffix == ".pdf":
+        return "pdf"
+    if suffix in {".jpg", ".jpeg", ".png", ".gif", ".webp"}:
+        return "paper"
+    return "unknown"
+
+
+def _get_receipt_record_for_expense(expense: Expense) -> Receipt | None:
+    """Return the canonical receipt row for an expense if one exists."""
+    receipt_obj = expense.receipt
+    if receipt_obj is not None:
+        return receipt_obj
+
+    stmt = (
+        select(Receipt)
+        .where(Receipt.expense_id == expense.id)
+        .where(Receipt.user_id == expense.user_id)
+        .order_by(Receipt.id.asc())
+    )
+    return db.session.scalars(stmt).first()
+
+
+def _upsert_receipt_record_for_expense(expense: Expense, storage_path: str) -> Receipt:
+    """Create or update the structured receipt row for an expense."""
+    receipt = _get_receipt_record_for_expense(expense)
+    if receipt is None:
+        receipt = Receipt(
+            expense_id=expense.id,
+            restaurant_id=expense.restaurant_id,
+            visit_id=expense.visit_id,
+            user_id=expense.user_id,
+            file_uri=storage_path,
+            receipt_type=_infer_receipt_type(storage_path),
+        )
+        db.session.add(receipt)
+        db.session.flush()
+    else:
+        receipt.expense_id = expense.id
+        receipt.restaurant_id = expense.restaurant_id
+        receipt.visit_id = expense.visit_id
+        receipt.user_id = expense.user_id
+        receipt.file_uri = storage_path
+        receipt.receipt_type = _infer_receipt_type(storage_path)
+
+    # Transitional mirror until the legacy field is removed everywhere.
+    expense.receipt = receipt
+    expense.receipt_image = storage_path
+    return receipt
+
+
+def _delete_receipt_records_for_expense(expense: Expense) -> None:
+    """Delete all structured receipt rows for an expense."""
+    stmt = select(Receipt).where(Receipt.expense_id == expense.id).where(Receipt.user_id == expense.user_id)
+    for receipt in db.session.execute(stmt).scalars().all():
+        db.session.delete(receipt)
+
+
 def create_expense(
     user_id: int, form: ExpenseForm, receipt_file: FileStorage | None = None
 ) -> tuple[Expense | None, str | None]:
@@ -561,10 +922,10 @@ def create_expense(
         if isinstance(expense_data, str):  # Error message
             return None, expense_data
 
-        category_id, restaurant_id, datetime_value, amount, tags = expense_data
+        category_id, restaurant_id, datetime_value, cleared_date, amount, tags = expense_data
 
         # Handle receipt upload if provided
-        receipt_image_path = None
+        receipt_image_path: str | None = None
         if receipt_file and receipt_file.filename:
             try:
                 from flask import current_app
@@ -602,6 +963,7 @@ def create_expense(
             user_id=user_id,
             amount=amount,
             date=datetime_value,
+            cleared_date=cleared_date,
             notes=form.notes.data.strip() if form.notes.data else None,
             category_id=category_id,
             restaurant_id=restaurant_id,
@@ -612,6 +974,11 @@ def create_expense(
         )
 
         db.session.add(expense)
+        db.session.flush()
+
+        if receipt_image_path:
+            _upsert_receipt_record_for_expense(expense, receipt_image_path)
+
         db.session.commit()
 
         # Add tags to the expense after it's created
@@ -688,7 +1055,7 @@ def _combine_date_time_with_timezone(date_value: date, time_value: time | None, 
 
 def _process_expense_form_data(
     form: ExpenseForm, browser_timezone: str = "UTC"
-) -> tuple[int | None, int | None, datetime, Decimal, list[str]] | str:
+) -> tuple[int | None, int | None, datetime, date | None, Decimal, list[str]] | str:
     """Process all form data for expense creation/update.
 
     Args:
@@ -720,6 +1087,10 @@ def _process_expense_form_data(
     if error:
         return error
 
+    cleared_date, error = _process_optional_date(form.cleared_date.data)
+    if error:
+        return error
+
     amount, error = _process_amount(form.amount.data)
     if error:
         return error
@@ -740,7 +1111,7 @@ def _process_expense_form_data(
         f"browser_tz={browser_timezone}, result_datetime={datetime_value}"
     )
 
-    return category_id, restaurant_id, datetime_value, amount, tags
+    return category_id, restaurant_id, datetime_value, cleared_date, amount, tags
 
 
 def _handle_receipt_update(expense: Expense, receipt_file: FileStorage | None, delete_receipt: bool) -> str | None:
@@ -756,7 +1127,7 @@ def _handle_receipt_update(expense: Expense, receipt_file: FileStorage | None, d
     """
     if receipt_file and receipt_file.filename:
         return _upload_new_receipt(expense, receipt_file)
-    elif delete_receipt and expense.receipt_image:
+    elif delete_receipt and expense.receipt_storage_path:
         return _delete_existing_receipt(expense)
     return None
 
@@ -776,8 +1147,9 @@ def _upload_new_receipt(expense: Expense, receipt_file: FileStorage) -> str | No
         if error:
             return error
 
-        # Store the storage path directly (S3 key or local filename)
-        expense.receipt_image = storage_path
+        if storage_path is None:
+            return "Receipt storage path is not set"
+        _upsert_receipt_record_for_expense(expense, storage_path)
         current_app.logger.info(f"Receipt updated: {storage_path}")
         return None
     except Exception as e:
@@ -792,19 +1164,21 @@ def _delete_existing_receipt(expense: Expense) -> str | None:
 
         from app.expenses.utils import delete_receipt_from_storage
 
-        # Check if there's actually a receipt to delete
-        if not expense.receipt_image:
+        storage_path = expense.receipt_storage_path
+        if not storage_path:
             current_app.logger.info("No receipt to delete")
             return None
 
         upload_folder = current_app.config.get("UPLOAD_FOLDER")
         if not isinstance(upload_folder, str):
             return "UPLOAD_FOLDER configuration is not set"
-        error = delete_receipt_from_storage(expense.receipt_image, upload_folder)
+        error = delete_receipt_from_storage(storage_path, upload_folder)
 
         if error:
             return error
 
+        _delete_receipt_records_for_expense(expense)
+        expense.receipt = None
         expense.receipt_image = None
         current_app.logger.info("Receipt deleted from expense")
         return None
@@ -833,9 +1207,6 @@ def update_expense(
     try:
         current_app.logger.info("Updating expense with form data: %s", form.data)
 
-        # Get user timezone for proper time handling
-        from app.extensions import db
-
         # Get browser timezone for proper time handling
         from app.utils.timezone_utils import get_browser_timezone, normalize_timezone
 
@@ -846,7 +1217,7 @@ def update_expense(
         if isinstance(expense_data, str):  # Error message
             return None, expense_data
 
-        category_id, restaurant_id, date_value, amount, tags = expense_data
+        category_id, restaurant_id, date_value, cleared_date, amount, tags = expense_data
 
         # Handle receipt upload/deletion
         receipt_error = _handle_receipt_update(expense, receipt_file, delete_receipt)
@@ -858,6 +1229,7 @@ def update_expense(
         # date_value from _combine_date_time_with_timezone is already timezone-aware (UTC)
         old_date = expense.date
         expense.date = date_value
+        expense.cleared_date = cleared_date
         current_app.logger.info(
             f"Updating expense {expense.id} date: "
             f"OLD: {old_date} (tz-aware: {old_date.tzinfo is not None if old_date else 'N/A'}), "
@@ -871,6 +1243,13 @@ def update_expense(
         expense.meal_type = form.meal_type.data or None
         expense.order_type = form.order_type.data or None
         expense.party_size = form.party_size.data
+
+        receipt_record = _get_receipt_record_for_expense(expense)
+        if receipt_record is None and expense.receipt_image:
+            receipt_record = _upsert_receipt_record_for_expense(expense, expense.receipt_image)
+        if receipt_record is not None:
+            receipt_record.restaurant_id = expense.restaurant_id
+            receipt_record.visit_id = expense.visit_id
 
         current_app.logger.info("Updated expense data: %s", expense)
         db.session.commit()
@@ -899,6 +1278,7 @@ def delete_expense(expense: Expense) -> None:
         expense: The expense to delete
     """
     user_id = expense.user_id
+    _delete_receipt_records_for_expense(expense)
     db.session.delete(expense)
     db.session.commit()
 
@@ -919,7 +1299,10 @@ def get_expense_by_id(expense_id: int, user_id: int) -> Expense | None:
         The expense if found and belongs to the user, None otherwise
     """
     result = (
-        Expense.query.options(joinedload(Expense.expense_tags).joinedload(ExpenseTag.tag))
+        Expense.query.options(
+            joinedload(Expense.expense_tags).joinedload(ExpenseTag.tag),
+            joinedload(Expense.receipt),
+        )
         .filter_by(id=expense_id, user_id=user_id)
         .first()
     )
@@ -953,9 +1336,10 @@ def get_expenses_for_user(
     Returns:
         List of expenses belonging to the user
     """
-    query = Expense.query.options(joinedload(Expense.expense_tags).joinedload(ExpenseTag.tag)).filter_by(
-        user_id=user_id
-    )
+    query = Expense.query.options(
+        joinedload(Expense.expense_tags).joinedload(ExpenseTag.tag),
+        joinedload(Expense.receipt),
+    ).filter_by(user_id=user_id)
 
     if start_date:
         query = query.filter(Expense.date >= start_date.date())
@@ -982,6 +1366,7 @@ def create_expense_for_user(user_id: int, data: dict[str, Any]) -> Expense:
         user_id=user_id,
         amount=data.get("amount"),
         date=data.get("date"),
+        cleared_date=data.get("cleared_date"),
         category_id=data.get("category_id"),
         restaurant_id=data.get("restaurant_id"),
         notes=data.get("notes"),
@@ -1009,6 +1394,8 @@ def update_expense_for_user(expense: Expense, data: dict[str, Any]) -> Expense:
         expense.amount = data["amount"]
     if "date" in data:
         expense.date = data["date"]
+    if "cleared_date" in data:
+        expense.cleared_date = data["cleared_date"]
     if "category_id" in data:
         expense.category_id = data["category_id"]
     if "restaurant_id" in data:
@@ -1167,7 +1554,7 @@ def export_expenses_for_user(user_id: int, expense_ids: list[int] | None = None)
     def format_tag_names(expense: Expense) -> str:
         """Format tag names as a comma-separated string."""
         tag_names = [tag.name for tag in expense.tags if tag and tag.name]
-        return ", ".join(sorted(tag_names)) if tag_names else ""
+        return ", ".join(tag_names) if tag_names else ""
 
     def to_utc_datetime_string(expense: Expense) -> tuple[str, str, str]:
         """Return (date, time_utc, datetime_utc) strings for export."""
@@ -1194,6 +1581,7 @@ def export_expenses_for_user(user_id: int, expense_ids: list[int] | None = None)
             {
                 # Backup-friendly: include both a human-friendly date and full UTC timestamp.
                 "date": date_str,
+                "cleared_date": expense.cleared_date.isoformat() if isinstance(expense.cleared_date, date) else "",
                 "time_utc": time_str,
                 "datetime_utc": datetime_str,
                 "amount": safe_float(expense.amount) if expense.amount is not None else "",
@@ -1202,7 +1590,7 @@ def export_expenses_for_user(user_id: int, expense_ids: list[int] | None = None)
                 "party_size": expense.party_size if expense.party_size is not None else "",
                 "notes": expense.notes or "",
                 "category_name": expense.category.name if expense.category else "",
-                "restaurant_name": expense.restaurant.name if expense.restaurant else "",
+                "restaurant_name": expense.restaurant.display_name if expense.restaurant else "",
                 "restaurant_address": expense.restaurant.address if expense.restaurant else "",
                 "restaurant_city": expense.restaurant.city if expense.restaurant else "",
                 "restaurant_state": expense.restaurant.state if expense.restaurant else "",
@@ -1251,19 +1639,39 @@ def _normalize_field_names(data_row: dict[str, Any]) -> dict[str, Any]:
     """
     # Define field mappings (case-insensitive)
     field_mappings = {
+        # Canonical field names (case-insensitive pass-through)
+        "date": "date",
+        "visit_date": "visit_date",
+        "cleared_date": "cleared_date",
+        "amount": "amount",
+        "restaurant_name": "restaurant_name",
+        "restaurant_address": "restaurant_address",
+        "category_name": "category_name",
+        "meal_type": "meal_type",
+        "order_type": "order_type",
+        "party_size": "party_size",
+        "notes": "notes",
+        "tags": "tags",
+        "datetime_utc": "datetime_utc",
+        "time_utc": "time_utc",
+        "restaurant_city": "restaurant_city",
+        "restaurant_state": "restaurant_state",
+        "restaurant_postal_code": "restaurant_postal_code",
+        "restaurant_country": "restaurant_country",
+        "restaurant_google_place_id": "restaurant_google_place_id",
         # Date field mappings
         "postedon": "date",
         "posted_on": "date",
         "transaction_date": "date",
         "expense_date": "date",
+        "visit date": "visit_date",
+        "cleared date": "cleared_date",
         "when": "date",
         "datetime": "datetime_utc",
         "date_time": "datetime_utc",
-        "datetime_utc": "datetime_utc",
         "timestamp": "datetime_utc",
         # Time field mappings
         "time": "time_utc",
-        "time_utc": "time_utc",
         "transaction_time": "time_utc",
         # Amount field mappings
         "cost": "amount",
@@ -1287,26 +1695,19 @@ def _normalize_field_names(data_row: dict[str, Any]) -> dict[str, Any]:
         "address": "restaurant_address",
         "location_address": "restaurant_address",
         "vendor_address": "restaurant_address",
-        "restaurant_city": "restaurant_city",
         "city": "restaurant_city",
-        "restaurant_state": "restaurant_state",
         "state": "restaurant_state",
-        "restaurant_postal_code": "restaurant_postal_code",
         "postal_code": "restaurant_postal_code",
         "zip": "restaurant_postal_code",
         "zip_code": "restaurant_postal_code",
-        "restaurant_country": "restaurant_country",
         "country": "restaurant_country",
-        "restaurant_google_place_id": "restaurant_google_place_id",
         "google_place_id": "restaurant_google_place_id",
         # Meal type mappings
         "meal": "meal_type",
         "meal_category": "meal_type",
         # Order / party mappings
-        "order_type": "order_type",
         "order": "order_type",
         "service_type": "order_type",
-        "party_size": "party_size",
         "party": "party_size",
         "people": "party_size",
         "guests": "party_size",
@@ -1318,7 +1719,6 @@ def _normalize_field_names(data_row: dict[str, Any]) -> dict[str, Any]:
         "remarks": "notes",
         # Tag mappings
         "tag": "tags",
-        "tags": "tags",
         "label": "tags",
         "labels": "tags",
     }
@@ -1406,7 +1806,7 @@ def _parse_import_tags(tags_value: Any) -> tuple[list[str] | None, str | None]:
                 return None, error
             return _validate_tags_list(parsed_tags)
 
-        parsed = [tag.strip() for tag in tags_str.split(",") if tag.strip()]
+        parsed = [tag.strip() for tag in re.split(r"[;,]", tags_str) if tag.strip()]
         return parsed, None
 
     if isinstance(tags_value, list):
@@ -1420,6 +1820,21 @@ def _normalize_tag_name(tag_name: str) -> str:
     normalized_name = tag_name.strip().replace(" ", "-")
     normalized_name = "".join(c for c in normalized_name if c.isalnum() or c == "-")
     return normalized_name
+
+
+def _detect_import_source_type(row: dict[str, Any]) -> str:
+    """Infer the import source type from row headers."""
+    normalized_keys = {str(key).strip().lower() for key in row.keys() if str(key).strip()}
+    if "payee" in normalized_keys or "exclusion" in normalized_keys:
+        return "simplifi"
+    if (
+        "visit_date" in normalized_keys
+        or "cleared_date" in normalized_keys
+        or "datetime_utc" in normalized_keys
+        or "time_utc" in normalized_keys
+    ):
+        return "standard"
+    return "standard"
 
 
 def _build_tag_summary(tag_counts: dict[str, int], created_tags: set[str]) -> list[dict[str, Any]]:
@@ -1453,6 +1868,17 @@ def _apply_import_tags_to_expense(
     if not normalized_tags:
         return
 
+    existing_linked_tag_ids = {
+        expense_tag.tag_id
+        for expense_tag in getattr(expense, "expense_tags", [])
+        if getattr(expense_tag, "tag_id", None)
+    }
+    existing_linked_tag_names = {
+        expense_tag.tag.name
+        for expense_tag in getattr(expense, "expense_tags", [])
+        if getattr(expense_tag, "tag", None) is not None and getattr(expense_tag.tag, "name", None)
+    }
+
     for tag_name in normalized_tags:
         tag = existing_tags.get(tag_name)
         if not tag:
@@ -1461,8 +1887,14 @@ def _apply_import_tags_to_expense(
             existing_tags[tag_name] = tag
             created_tags.add(tag_name)
 
+        if (tag.id is not None and tag.id in existing_linked_tag_ids) or tag.name in existing_linked_tag_names:
+            continue
+
         expense_tag = ExpenseTag(expense=expense, tag=tag, added_by=user_id)
         db.session.add(expense_tag)
+        if tag.id is not None:
+            existing_linked_tag_ids.add(tag.id)
+        existing_linked_tag_names.add(tag.name)
         tag_counts[tag_name] = tag_counts.get(tag_name, 0) + 1
 
 
@@ -1551,6 +1983,9 @@ def _parse_standard_date_formats(date_str: str) -> tuple[date | None, str | None
         "%m-%d-%Y",  # Alternative: 8-30-2025, 08-30-2025
         "%d/%m/%Y",  # European: 30/8/2025, 30/08/2025
         "%Y/%m/%d",  # Alternative ISO: 2025/08/30
+        "%d-%b-%y",  # Simplifi style: 7-Mar-26
+        "%d-%b-%Y",  # Simplifi style with 4-digit year
+        "%b %d, %Y",  # Simplifi default: Jan 1, 2025
     ]
 
     # Try each format
@@ -1636,7 +2071,7 @@ def _parse_expense_datetime_utc(data: dict[str, Any]) -> tuple[datetime | None, 
     Supported inputs (in priority order):
     - datetime_utc: ISO datetime string (with Z or offset)
     - date + time_utc: date + optional time (assumed UTC)
-    - date only: interpreted as noon UTC (preserves intended date across timezones)
+    - date only: interpreted as midnight UTC for storage; review UI can still show that no explicit time was provided
     """
     raw_datetime = data.get("datetime_utc")
     if raw_datetime is not None:
@@ -1669,8 +2104,8 @@ def _parse_expense_datetime_utc(data: dict[str, Any]) -> tuple[datetime | None, 
     if parsed_date is None:
         return None, None, "Date is required"
 
-    # If no time is provided, use noon UTC (matches model validation intent).
-    final_time = parsed_time if parsed_time is not None else time.min.replace(hour=12)
+    # If no time is provided, store the date at midnight UTC.
+    final_time = parsed_time if parsed_time is not None else time.min
     dt_utc = datetime.combine(parsed_date, final_time, tzinfo=UTC).replace(microsecond=0)
     return dt_utc, parsed_date, None
 
@@ -1800,6 +2235,21 @@ def _find_category_by_name(category_name: str, user_id: int) -> Category | None:
     return cast(Category | None, category)
 
 
+def _normalize_import_category_name(category_name: str | None) -> str:
+    """Normalize import category names for Simplifi-style hierarchical categories."""
+    raw_name = str(category_name or "").strip()
+    if not raw_name:
+        return ""
+
+    if ":" in raw_name:
+        _left, right = raw_name.split(":", 1)
+        normalized_right = right.strip()
+        if normalized_right:
+            return normalized_right
+
+    return raw_name
+
+
 def _find_or_create_restaurant(
     restaurant_name: str, restaurant_address: str, user_id: int
 ) -> tuple[Restaurant | None, str | None]:
@@ -1922,6 +2372,7 @@ class ExpenseImportContext:
     categories_all: list[Category]
     restaurants_by_name: dict[str, list[Restaurant]]
     restaurants_by_name_address: dict[tuple[str, str], Restaurant]
+    restaurants_by_google_place_id: dict[str, Restaurant]
     existing_duplicate_keys: set[tuple[int | None, Decimal, date, str | None]]
     seen_import_keys: set[tuple[int | tuple[str, str] | None, Decimal, date, str | None]]
 
@@ -2002,11 +2453,12 @@ def _find_category_for_import(category_name: str, ctx: ExpenseImportContext) -> 
 
 def _build_restaurant_cache_for_import(
     user_id: int,
-) -> tuple[dict[str, list[Restaurant]], dict[tuple[str, str], Restaurant]]:
+) -> tuple[dict[str, list[Restaurant]], dict[tuple[str, str], Restaurant], dict[str, Restaurant]]:
     """Build restaurant caches for import processing (avoid per-row queries)."""
     restaurants = Restaurant.query.filter_by(user_id=user_id).all()
     restaurants_by_name: dict[str, list[Restaurant]] = {}
     restaurants_by_name_address: dict[tuple[str, str], Restaurant] = {}
+    restaurants_by_google_place_id: dict[str, Restaurant] = {}
 
     for restaurant in restaurants:
         name = restaurant.name.strip() if restaurant.name else ""
@@ -2018,7 +2470,11 @@ def _build_restaurant_cache_for_import(
         if address:
             restaurants_by_name_address[(name, address)] = restaurant
 
-    return restaurants_by_name, restaurants_by_name_address
+        place_id = (restaurant.google_place_id or "").strip()
+        if place_id:
+            restaurants_by_google_place_id[place_id] = restaurant
+
+    return restaurants_by_name, restaurants_by_name_address, restaurants_by_google_place_id
 
 
 def _find_existing_restaurant_for_import(
@@ -2026,11 +2482,18 @@ def _find_existing_restaurant_for_import(
     restaurant_address: str,
     ctx: ExpenseImportContext,
     restaurant_city: str | None = None,
+    restaurant_google_place_id: str | None = None,
 ) -> Restaurant | None:
     """Find an existing restaurant for import duplicate prefetch (no creation, no warnings)."""
     name = restaurant_name.strip()
     if not name:
         return None
+
+    place_id = (restaurant_google_place_id or "").strip()
+    if place_id:
+        existing = ctx.restaurants_by_google_place_id.get(place_id)
+        if existing:
+            return existing
 
     address = restaurant_address.strip() if restaurant_address else ""
     if address:
@@ -2057,6 +2520,14 @@ def _find_or_create_restaurant_for_import(
     restaurant_details: dict[str, Any] | None = None,
 ) -> tuple[Restaurant | None, str | None]:
     """Import-specific restaurant resolution using caches (creates without per-row DB lookups)."""
+    from app.merchants.services import find_merchant_for_restaurant_name
+
+    def assign_merchant_if_missing(restaurant: Restaurant) -> None:
+        if restaurant.merchant_id is not None:
+            return
+        matched_merchant = find_merchant_for_restaurant_name(restaurant.name or "")
+        if matched_merchant:
+            restaurant.merchant_id = matched_merchant.id
 
     def merge_details(restaurant: Restaurant) -> None:
         if not restaurant_details:
@@ -2088,12 +2559,29 @@ def _find_or_create_restaurant_for_import(
     if not name:
         return None, None
 
+    place_id = str((restaurant_details or {}).get("restaurant_google_place_id") or "").strip() or None
+    if place_id:
+        existing_by_place_id = ctx.restaurants_by_google_place_id.get(place_id)
+        if existing_by_place_id:
+            merge_details(existing_by_place_id)
+            assign_merchant_if_missing(existing_by_place_id)
+            return existing_by_place_id, None
+
     address = restaurant_address.strip() if restaurant_address else ""
     if address:
         existing = ctx.restaurants_by_name_address.get((name, address))
         if existing:
             merge_details(existing)
+            assign_merchant_if_missing(existing)
             return existing, None
+
+        if place_id and place_id in ctx.restaurants_by_google_place_id:
+            existing_by_place_id = ctx.restaurants_by_google_place_id[place_id]
+            merge_details(existing_by_place_id)
+            assign_merchant_if_missing(existing_by_place_id)
+            ctx.restaurants_by_name.setdefault(name, []).append(existing_by_place_id)
+            ctx.restaurants_by_name_address[(name, address)] = existing_by_place_id
+            return existing_by_place_id, None
 
         new_restaurant = Restaurant(
             user_id=ctx.user_id,
@@ -2105,15 +2593,18 @@ def _find_or_create_restaurant_for_import(
             country=str((restaurant_details or {}).get("restaurant_country") or "").strip() or None,
             google_place_id=str((restaurant_details or {}).get("restaurant_google_place_id") or "").strip() or None,
         )
+        assign_merchant_if_missing(new_restaurant)
         db.session.add(new_restaurant)
-
         ctx.restaurants_by_name.setdefault(name, []).append(new_restaurant)
         ctx.restaurants_by_name_address[(name, address)] = new_restaurant
+        if place_id:
+            ctx.restaurants_by_google_place_id[place_id] = new_restaurant
         return new_restaurant, None
 
     name_matches = ctx.restaurants_by_name.get(name, [])
     if len(name_matches) == 1:
         merge_details(name_matches[0])
+        assign_merchant_if_missing(name_matches[0])
         return name_matches[0], None
     if len(name_matches) > 1:
         # If city is provided, try to disambiguate by city
@@ -2129,6 +2620,13 @@ def _find_or_create_restaurant_for_import(
             f"Restaurant '{name}' matches multiple existing restaurants. Please provide an address to disambiguate.",
         )
 
+    if place_id and place_id in ctx.restaurants_by_google_place_id:
+        existing_by_place_id = ctx.restaurants_by_google_place_id[place_id]
+        merge_details(existing_by_place_id)
+        assign_merchant_if_missing(existing_by_place_id)
+        ctx.restaurants_by_name.setdefault(name, []).append(existing_by_place_id)
+        return existing_by_place_id, None
+
     # No matches and no address: create a restaurant so CSV backups can be restored.
     new_restaurant = Restaurant(
         user_id=ctx.user_id,
@@ -2138,10 +2636,13 @@ def _find_or_create_restaurant_for_import(
         state=str((restaurant_details or {}).get("restaurant_state") or "").strip() or None,
         postal_code=str((restaurant_details or {}).get("restaurant_postal_code") or "").strip() or None,
         country=str((restaurant_details or {}).get("restaurant_country") or "").strip() or None,
-        google_place_id=str((restaurant_details or {}).get("restaurant_google_place_id") or "").strip() or None,
+        google_place_id=place_id,
     )
+    assign_merchant_if_missing(new_restaurant)
     db.session.add(new_restaurant)
     ctx.restaurants_by_name.setdefault(name, []).append(new_restaurant)
+    if place_id:
+        ctx.restaurants_by_google_place_id[place_id] = new_restaurant
     return new_restaurant, None
 
 
@@ -2164,6 +2665,7 @@ def _compute_import_duplicate_prefetch_scope(
         restaurant_name = str(row.get("restaurant_name", "") or "").strip()
         restaurant_address = str(row.get("restaurant_address", "") or "").strip()
         restaurant_city = str(row.get("restaurant_city", "") or "").strip()
+        restaurant_google_place_id = str(row.get("restaurant_google_place_id", "") or "").strip() or None
         if not restaurant_name:
             includes_null_restaurant = True
             continue
@@ -2173,6 +2675,7 @@ def _compute_import_duplicate_prefetch_scope(
             restaurant_address,
             ctx,
             restaurant_city=restaurant_city,
+            restaurant_google_place_id=restaurant_google_place_id,
         )
         if existing_restaurant and existing_restaurant.id is not None:
             restaurant_ids.add(int(existing_restaurant.id))
@@ -2222,7 +2725,9 @@ def _prefetch_existing_duplicate_keys_for_import(
 def _build_expense_import_context(user_id: int, data: list[dict[str, Any]]) -> ExpenseImportContext:
     """Build a full import context with in-memory caches and prefetched duplicates."""
     categories_by_name, categories_by_lower_name, categories_all = _build_category_cache_for_import(user_id)
-    restaurants_by_name, restaurants_by_name_address = _build_restaurant_cache_for_import(user_id)
+    restaurants_by_name, restaurants_by_name_address, restaurants_by_google_place_id = (
+        _build_restaurant_cache_for_import(user_id)
+    )
 
     ctx = ExpenseImportContext(
         user_id=user_id,
@@ -2231,6 +2736,7 @@ def _build_expense_import_context(user_id: int, data: list[dict[str, Any]]) -> E
         categories_all=categories_all,
         restaurants_by_name=restaurants_by_name,
         restaurants_by_name_address=restaurants_by_name_address,
+        restaurants_by_google_place_id=restaurants_by_google_place_id,
         existing_duplicate_keys=set(),
         seen_import_keys=set(),
     )
@@ -2682,10 +3188,1174 @@ def import_expenses_from_csv(file: FileStorage, user_id: int) -> tuple[bool, dic
         # Generate the result data
         return _generate_import_result(success_count, errors, info_messages, import_summary)
 
+    except IntegrityError as e:
+        db.session.rollback()
+        error_str = str(e.orig) if getattr(e, "orig", None) else str(e)
+        if "restaurant" in error_str.lower() and "unique" in error_str.lower():
+            error_msg = (
+                "Import failed: a restaurant in the file already exists (same Google Place ID). "
+                "The import now reuses existing restaurants by Place ID; if you still see this, "
+                "please report the file format."
+            )
+        else:
+            error_msg = f"Import failed due to a data conflict: {error_str}"
+        return False, {"message": error_msg, "has_errors": True, "error_details": [error_msg]}
     except Exception as e:
         db.session.rollback()
         error_msg = f"Error processing file: {str(e)}"
         return False, {"message": error_msg, "has_errors": True, "error_details": [error_msg]}
+
+
+def _normalize_import_match_text(value: str | None) -> str:
+    """Normalize payee/restaurant text for import matching."""
+    if value is None:
+        return ""
+
+    normalized = value.lower()
+    normalized = normalized.replace("&", " and ")
+    normalized = re.sub(r"\b(app|online|order|mobile)\b", " ", normalized)
+    normalized = re.sub(r"[^a-z0-9]+", " ", normalized)
+    normalized = re.sub(r"\s+", " ", normalized).strip()
+    return normalized
+
+
+def _is_blank_import_row(row: dict[str, Any]) -> bool:
+    """Return True when an import row has no meaningful values."""
+    for value in row.values():
+        if value is None:
+            continue
+        if str(value).strip():
+            return False
+    return True
+
+
+def _build_import_name_variants(value: str | None) -> set[str]:
+    """Build normalized name variants for payee/restaurant comparison."""
+    raw_value = str(value or "").strip()
+    if not raw_value:
+        return set()
+
+    variants: set[str] = set()
+    normalized = _normalize_import_match_text(raw_value)
+    if normalized:
+        variants.add(normalized)
+
+    for separator in [" - ", " – ", " — ", ":"]:
+        if separator in raw_value:
+            head = raw_value.split(separator, 1)[0].strip()
+            head_normalized = _normalize_import_match_text(head)
+            if head_normalized:
+                variants.add(head_normalized)
+
+    tokens = normalized.split()
+    if tokens:
+        variants.add(" ".join(token for token in tokens if token not in {"the"}).strip())
+
+    return {variant for variant in variants if variant}
+
+
+def _shared_prefix_word_count(left: str, right: str) -> int:
+    """Return the count of shared leading words between two normalized strings."""
+    left_parts = left.split()
+    right_parts = right.split()
+    count = 0
+    for left_part, right_part in zip(left_parts, right_parts):
+        if left_part != right_part:
+            break
+        count += 1
+    return count
+
+
+def _score_import_restaurant_match(payee_name: str, restaurant: Restaurant) -> int:
+    """Score a restaurant candidate for an imported payee name."""
+    payee_variants = _build_import_name_variants(payee_name)
+    if not payee_variants:
+        return 0
+
+    restaurant_variants: set[str] = set()
+    restaurant_variants.update(_build_import_name_variants(restaurant.name))
+    restaurant_variants.update(_build_import_name_variants(restaurant.display_name))
+
+    best_score = 0
+    for payee_variant in payee_variants:
+        for restaurant_variant in restaurant_variants:
+            if payee_variant == restaurant_variant:
+                best_score = max(best_score, 100)
+            elif (
+                payee_variant
+                and restaurant_variant
+                and (payee_variant in restaurant_variant or restaurant_variant in payee_variant)
+            ):
+                best_score = max(best_score, 80)
+            else:
+                shared_prefix = _shared_prefix_word_count(payee_variant, restaurant_variant)
+                if shared_prefix >= 3:
+                    best_score = max(best_score, 88)
+                elif shared_prefix >= 2:
+                    best_score = max(best_score, 84)
+    return best_score
+
+
+def _is_exact_import_display_name_match(payee_name: str, restaurant: Restaurant) -> bool:
+    """Return True when the imported payee exactly matches the restaurant display name."""
+    normalized_payee = _normalize_import_match_text(payee_name)
+    normalized_display_name = _normalize_import_match_text(restaurant.display_name or "")
+    return bool(normalized_payee and normalized_payee == normalized_display_name)
+
+
+def _is_exact_import_address_match(imported_address: str, restaurant: Restaurant) -> bool:
+    """Return True when the imported address exactly matches the restaurant address."""
+    normalized_imported_address = _normalize_import_match_text(imported_address)
+    restaurant_address_variants = {
+        _normalize_import_match_text(restaurant.address or ""),
+        _normalize_import_match_text(restaurant.full_address or ""),
+    }
+    return bool(
+        normalized_imported_address
+        and normalized_imported_address in {variant for variant in restaurant_address_variants if variant}
+    )
+
+
+def _serialize_restaurant_for_import_review(
+    restaurant: Restaurant,
+    score: int,
+    match_basis: str,
+    *,
+    exact_display_name_match: bool = False,
+    exact_address_match: bool = False,
+) -> dict[str, Any]:
+    """Serialize restaurant summary for import review UI."""
+    return {
+        "id": restaurant.id,
+        "name": restaurant.name,
+        "display_name": restaurant.display_name,
+        "city": restaurant.city or "",
+        "state": restaurant.state or "",
+        "postal_code": restaurant.postal_code or "",
+        "address": restaurant.address or "",
+        "detail_url": url_for("restaurants.restaurant_details", restaurant_id=restaurant.id, _external=True),
+        "match_score": score,
+        "match_basis": match_basis,
+        "exact_display_name_match": exact_display_name_match,
+        "exact_address_match": exact_address_match,
+    }
+
+
+def _sort_restaurants_for_import_review(restaurants: list[Restaurant]) -> list[Restaurant]:
+    """Return restaurants sorted alphabetically by display name for review UIs."""
+    return sorted(
+        restaurants,
+        key=lambda restaurant: ((restaurant.display_name or restaurant.name or "").lower(), restaurant.id),
+    )
+
+
+def _serialize_duplicate_expense_for_import_review(expense: Expense) -> dict[str, Any]:
+    """Serialize duplicate-candidate summary for import review UI."""
+    return {
+        "id": expense.id,
+        "label": f"Expense #{expense.id}",
+        "date": expense.date.date().isoformat() if expense.date else "",
+        "visit_date": expense.date.date().isoformat() if expense.date else "",
+        "cleared_date": expense.cleared_date.isoformat() if isinstance(expense.cleared_date, date) else "",
+        "time_display": expense.date.strftime("%H:%M UTC") if expense.date else "",
+        "datetime_display": expense.date.strftime("%Y-%m-%d %H:%M UTC") if expense.date else "",
+        "amount": f"{expense.amount:.2f}" if expense.amount is not None else "",
+        "restaurant_name": expense.restaurant.display_name if expense.restaurant else "",
+        "restaurant_address": expense.restaurant.address if expense.restaurant else "",
+        "category_name": expense.category.name if expense.category else "",
+        "meal_type": expense.meal_type or "",
+        "order_type": expense.order_type or "",
+        "party_size": expense.party_size,
+        "notes": expense.notes or "",
+        "tags": [tag.name for tag in expense.tags],
+        "detail_url": url_for("expenses.expense_details", expense_id=expense.id, _external=True),
+    }
+
+
+def _import_row_has_explicit_time(row: dict[str, Any]) -> bool:
+    """Return True when the raw import row includes an explicit time component."""
+    raw_datetime = str(row.get("datetime_utc") or "").strip()
+    if raw_datetime:
+        return "T" in raw_datetime or " " in raw_datetime
+
+    raw_time = str(row.get("time_utc") or "").strip()
+    return bool(raw_time)
+
+
+def _format_import_review_value(value: Any, empty_label: str = "Not provided") -> str:
+    """Format a comparison value for the import review UI."""
+    if value is None:
+        return empty_label
+
+    if isinstance(value, Decimal):
+        return f"${value:.2f}"
+
+    if isinstance(value, list):
+        return ", ".join(str(item) for item in value) if value else empty_label
+
+    text = str(value).strip()
+    return text if text else empty_label
+
+
+def _is_import_review_empty_value(value: Any) -> bool:
+    """Return True when a comparison value should be treated as missing."""
+    if value is None:
+        return True
+    if isinstance(value, list):
+        return len(value) == 0
+    if isinstance(value, str):
+        return not value.strip() or value.strip() == "Not provided"
+    return False
+
+
+def _ensure_utc_datetime(value: datetime | None) -> datetime | None:
+    """Return a timezone-aware UTC datetime."""
+    if value is None:
+        return None
+    if value.tzinfo is None:
+        return value.replace(tzinfo=UTC)
+    return value.astimezone(UTC)
+
+
+def _build_import_expense_datetime(
+    parsed_date: date,
+    parsed_datetime_utc: str,
+    has_explicit_time: bool,
+    existing_expense: Expense | None = None,
+) -> datetime:
+    """Build the stored expense datetime for an import review row."""
+    if parsed_datetime_utc:
+        parsed_datetime = datetime.fromisoformat(parsed_datetime_utc)
+        if parsed_datetime.tzinfo is None:
+            parsed_datetime = parsed_datetime.replace(tzinfo=UTC)
+        if has_explicit_time:
+            return parsed_datetime.astimezone(UTC).replace(microsecond=0)
+
+    existing_expense_datetime = _ensure_utc_datetime(existing_expense.date if existing_expense else None)
+    if existing_expense_datetime:
+        return datetime.combine(parsed_date, existing_expense_datetime.time(), tzinfo=UTC).replace(microsecond=0)
+
+    return datetime.combine(parsed_date, time.min, tzinfo=UTC).replace(microsecond=0)
+
+
+def _parse_import_review_dates(
+    row: dict[str, Any],
+    import_source_type: str,
+) -> tuple[datetime | None, date | None, date | None, str | None]:
+    """Parse visit and cleared dates for an import review row."""
+    parsed_visit_datetime_utc: datetime | None = None
+    parsed_visit_date: date | None = None
+    parsed_cleared_date: date | None = None
+
+    visit_row = dict(row)
+    explicit_visit_date = row.get("visit_date")
+    if explicit_visit_date not in (None, ""):
+        visit_row["date"] = explicit_visit_date
+
+    if import_source_type == "standard":
+        parsed_visit_datetime_utc, parsed_visit_date, date_error = _parse_expense_datetime_utc(visit_row)
+        if date_error:
+            return None, None, None, date_error
+        raw_cleared_date = row.get("cleared_date")
+        if raw_cleared_date not in (None, ""):
+            parsed_cleared_date, cleared_error = _parse_expense_date(raw_cleared_date)
+            if cleared_error:
+                return None, None, None, cleared_error
+        return parsed_visit_datetime_utc, parsed_visit_date, parsed_cleared_date, None
+
+    raw_cleared_date = row.get("cleared_date", row.get("date"))
+    parsed_cleared_date, cleared_error = _parse_expense_date(raw_cleared_date)
+    if cleared_error:
+        return None, None, None, cleared_error
+
+    if explicit_visit_date not in (None, ""):
+        parsed_visit_datetime_utc, parsed_visit_date, visit_error = _parse_expense_datetime_utc(visit_row)
+        if visit_error:
+            return None, None, None, visit_error
+
+    return parsed_visit_datetime_utc, parsed_visit_date, parsed_cleared_date, None
+
+
+def _build_cleared_date_warning(
+    visit_date: date | None,
+    cleared_date: date | None,
+    label: str | None = None,
+) -> str | None:
+    """Return a warning when cleared date is more than three days after visit date."""
+    if visit_date is None or cleared_date is None:
+        return None
+    delta_days = (cleared_date - visit_date).days
+    if delta_days <= 3:
+        return None
+
+    prefix = f"{label}: " if label else ""
+    return (
+        f"{prefix}Cleared date {cleared_date.isoformat()} is {delta_days} days after "
+        f"visit date {visit_date.isoformat()}."
+    )
+
+
+def _build_duplicate_expense_comparison(
+    duplicate_expense: Expense,
+    review_row: dict[str, Any],
+    normalized_tags: list[str],
+    matched_restaurant_name: str,
+) -> dict[str, Any]:
+    """Build a field-by-field comparison between an existing expense and the imported row."""
+    import_source_type = str(review_row.get("import_source_type") or "standard")
+    parsed_visit_date_raw = str(review_row.get("parsed_visit_date") or "").strip()
+    parsed_cleared_date_raw = str(review_row.get("parsed_cleared_date") or "").strip()
+    parsed_datetime_raw = str(review_row.get("parsed_visit_datetime_utc") or "").strip()
+    has_explicit_time = bool(review_row.get("has_explicit_time"))
+    imported_visit_date = date.fromisoformat(parsed_visit_date_raw) if parsed_visit_date_raw else None
+    imported_cleared_date = date.fromisoformat(parsed_cleared_date_raw) if parsed_cleared_date_raw else None
+    imported_datetime = (
+        _build_import_expense_datetime(imported_visit_date, parsed_datetime_raw, has_explicit_time, duplicate_expense)
+        if imported_visit_date
+        else None
+    )
+    imported_amount = Decimal(str(review_row.get("amount") or "0"))
+    imported_category_name = str(review_row.get("category_name") or "").strip()
+    imported_meal_type = str(review_row.get("meal_type") or "").strip()
+    imported_order_type = str(review_row.get("order_type") or "").strip()
+    imported_party_size_raw = str(review_row.get("party_size") or "").strip()
+    imported_party_size = int(imported_party_size_raw) if imported_party_size_raw.isdigit() else None
+    imported_notes = str(review_row.get("notes") or "").strip()
+    existing_tags = [tag.name for tag in duplicate_expense.tags]
+
+    duplicate_datetime = _ensure_utc_datetime(duplicate_expense.date)
+    current_restaurant_name = duplicate_expense.restaurant.display_name if duplicate_expense.restaurant else ""
+    current_category_name = duplicate_expense.category.name if duplicate_expense.category else ""
+    current_time_display = duplicate_datetime.strftime("%H:%M UTC") if duplicate_datetime else ""
+    imported_time_display = (
+        imported_datetime.astimezone(UTC).strftime("%H:%M UTC")
+        if has_explicit_time and imported_datetime is not None
+        else ""
+    )
+    field_specs = [
+        (
+            "Visit Date",
+            duplicate_datetime.date().isoformat() if duplicate_datetime else "",
+            imported_visit_date.isoformat() if imported_visit_date else "",
+        ),
+        ("Time", current_time_display, imported_time_display),
+        (
+            "Cleared Date",
+            duplicate_expense.cleared_date.isoformat() if isinstance(duplicate_expense.cleared_date, date) else "",
+            imported_cleared_date.isoformat() if imported_cleared_date else "",
+        ),
+        ("Amount", _format_import_review_value(duplicate_expense.amount), _format_import_review_value(imported_amount)),
+        (
+            "Restaurant",
+            _format_import_review_value(current_restaurant_name),
+            _format_import_review_value(matched_restaurant_name),
+        ),
+        (
+            "Expense category",
+            _format_import_review_value(current_category_name),
+            _format_import_review_value(imported_category_name),
+        ),
+        (
+            "Meal type",
+            _format_import_review_value(duplicate_expense.meal_type),
+            _format_import_review_value(imported_meal_type),
+        ),
+        (
+            "Order type",
+            _format_import_review_value(duplicate_expense.order_type),
+            _format_import_review_value(imported_order_type),
+        ),
+        (
+            "Party size",
+            _format_import_review_value(duplicate_expense.party_size),
+            _format_import_review_value(imported_party_size),
+        ),
+        ("Notes", _format_import_review_value(duplicate_expense.notes), _format_import_review_value(imported_notes)),
+        ("Tags", _format_import_review_value(existing_tags), _format_import_review_value(normalized_tags)),
+    ]
+
+    changes: list[dict[str, str]] = []
+    field_comparisons: list[dict[str, str]] = []
+    for field_label, current_value, new_value in field_specs:
+        if field_label == "Time" and not has_explicit_time:
+            status = "unchanged"
+        elif field_label == "Visit Date" and import_source_type == "simplifi" and not imported_visit_date:
+            status = "unchanged"
+        elif current_value == new_value:
+            status = "match"
+        elif _is_import_review_empty_value(current_value) and not _is_import_review_empty_value(new_value):
+            status = "add"
+        elif _is_import_review_empty_value(new_value):
+            status = "unchanged"
+        else:
+            status = "update"
+
+        field_comparisons.append(
+            {
+                "field": field_label,
+                "current": current_value,
+                "new": new_value,
+                "status": status,
+            }
+        )
+        if status in {"add", "update"}:
+            changes.append({"field": field_label, "current": current_value, "new": new_value})
+
+    return {
+        "change_count": len(changes),
+        "changes": changes,
+        "fields": field_comparisons,
+        "summary": (
+            "No fields would change."
+            if not changes
+            else "Update this expense with " + ", ".join(change["field"].lower() for change in changes) + "."
+        ),
+    }
+
+
+def _replace_import_tags_on_expense(
+    expense: Expense,
+    user_id: int,
+    normalized_tags: list[str],
+    existing_tags: dict[str, Tag],
+    created_tags: set[str],
+    tag_counts: dict[str, int],
+) -> None:
+    """Replace an expense's tags during import review without committing."""
+    expense.expense_tags.clear()
+    db.session.flush()
+    _apply_import_tags_to_expense(expense, user_id, normalized_tags, existing_tags, created_tags, tag_counts)
+
+
+def _find_restaurant_candidates_for_import_review(
+    payee_name: str,
+    restaurant_address: str,
+    restaurants: list[Restaurant],
+    limit: int = 5,
+) -> list[dict[str, Any]]:
+    """Find likely restaurant matches for a payee name."""
+    normalized_address = _normalize_import_match_text(restaurant_address)
+
+    if not normalized_address:
+        matches_without_address: list[tuple[int, str, Restaurant]] = []
+        for restaurant in restaurants:
+            exact_display_name_match = _is_exact_import_display_name_match(payee_name, restaurant)
+            if exact_display_name_match:
+                matches_without_address.append((130, "exact display name", restaurant))
+                continue
+
+            score = _score_import_restaurant_match(payee_name, restaurant)
+            if score <= 0:
+                continue
+
+            match_basis = "partial name"
+            if score >= 100:
+                match_basis = "exact name"
+            elif score >= 84:
+                match_basis = "shared prefix"
+            matches_without_address.append((score, match_basis, restaurant))
+
+        matches_without_address.sort(key=lambda item: (-item[0], item[2].display_name.lower(), item[2].id))
+        return [
+            _serialize_restaurant_for_import_review(
+                restaurant,
+                score,
+                match_basis,
+                exact_display_name_match=match_basis == "exact display name",
+            )
+            for score, match_basis, restaurant in matches_without_address[:limit]
+        ]
+
+    scored_matches: list[tuple[int, str, Restaurant]] = []
+    for restaurant in restaurants:
+        exact_display_name_match = _is_exact_import_display_name_match(payee_name, restaurant)
+        exact_address_match = _is_exact_import_address_match(restaurant_address, restaurant)
+        score = _score_import_restaurant_match(payee_name, restaurant)
+        match_basis = "name"
+
+        restaurant_address_variants = [
+            _normalize_import_match_text(restaurant.address or ""),
+            _normalize_import_match_text(restaurant.full_address or ""),
+        ]
+        if exact_display_name_match and exact_address_match:
+            score = max(score, 160)
+            match_basis = "exact display name + address"
+        elif exact_display_name_match:
+            score = max(score, 130)
+            match_basis = "exact display name"
+        elif exact_address_match:
+            score = max(score, 120)
+            match_basis = "exact address"
+        elif any(
+            restaurant_address_text
+            and (normalized_address in restaurant_address_text or restaurant_address_text in normalized_address)
+            for restaurant_address_text in restaurant_address_variants
+        ):
+            score = max(score, 95)
+            match_basis = "address"
+        if score > 0:
+            scored_matches.append((score, match_basis, restaurant))
+
+    scored_matches.sort(key=lambda item: (-item[0], item[2].display_name.lower(), item[2].id))
+    return [
+        _serialize_restaurant_for_import_review(
+            restaurant,
+            score,
+            match_basis,
+            exact_display_name_match=_is_exact_import_display_name_match(payee_name, restaurant),
+            exact_address_match=_is_exact_import_address_match(restaurant_address, restaurant),
+        )
+        for score, match_basis, restaurant in scored_matches[:limit]
+    ]
+
+
+def _find_duplicate_candidates_for_import_review(
+    user_id: int,
+    restaurant_id: int,
+    amount: Decimal,
+    expense_date: date,
+    window_days: int = 3,
+) -> list[Expense]:
+    """Find likely duplicate expenses for an import review row after restaurant matching."""
+    start_dt = datetime.combine(expense_date - timedelta(days=window_days), time.min, tzinfo=UTC)
+    end_dt = datetime.combine(expense_date + timedelta(days=window_days + 1), time.min, tzinfo=UTC)
+
+    stmt = (
+        select(Expense)
+        .options(joinedload(Expense.restaurant), joinedload(Expense.category))
+        .where(Expense.user_id == user_id)
+        .where(Expense.restaurant_id == restaurant_id)
+        .where(Expense.amount == abs(amount))
+        .where(Expense.date >= start_dt)
+        .where(Expense.date < end_dt)
+        .order_by(Expense.date.desc())
+    )
+    return list(db.session.scalars(stmt).all())
+
+
+def _find_duplicate_candidates_for_import_review_any_restaurant(
+    user_id: int,
+    amount: Decimal,
+    expense_date: date,
+    window_days: int = 3,
+) -> list[Expense]:
+    """Find likely duplicate expenses for an import review row regardless of restaurant."""
+    start_dt = datetime.combine(expense_date - timedelta(days=window_days), time.min, tzinfo=UTC)
+    end_dt = datetime.combine(expense_date + timedelta(days=window_days + 1), time.min, tzinfo=UTC)
+
+    stmt = (
+        select(Expense)
+        .options(joinedload(Expense.restaurant), joinedload(Expense.category))
+        .where(Expense.user_id == user_id)
+        .where(Expense.amount == abs(amount))
+        .where(Expense.date >= start_dt)
+        .where(Expense.date < end_dt)
+        .order_by(Expense.date.desc(), Expense.id.desc())
+    )
+    return list(db.session.scalars(stmt).all())
+
+
+def _serialize_duplicate_candidates_by_restaurant(
+    user_id: int,
+    restaurant_candidates: list[dict[str, Any]],
+    amount: Decimal | None,
+    duplicate_match_date: date | None,
+    import_source_type: str,
+    parsed_visit_date: date | None,
+    parsed_cleared_date: date | None,
+    parsed_visit_dt_utc: datetime | None,
+    has_explicit_time: bool,
+    category_name: str,
+    meal_type: str,
+    order_type: str,
+    party_size: str,
+    notes: str,
+    normalized_tag_names: list[str],
+) -> dict[str, list[dict[str, Any]]]:
+    """Build duplicate-candidate payloads keyed by candidate restaurant id."""
+    if amount is None or duplicate_match_date is None:
+        return {}
+
+    duplicates_by_restaurant: dict[str, list[dict[str, Any]]] = {}
+    for candidate in restaurant_candidates:
+        candidate_id = candidate.get("id")
+        if candidate_id is None:
+            continue
+
+        duplicate_candidates = _find_duplicate_candidates_for_import_review(
+            user_id=user_id,
+            restaurant_id=int(candidate_id),
+            amount=amount,
+            expense_date=duplicate_match_date,
+        )
+        serialized_candidates: list[dict[str, Any]] = []
+        for expense in duplicate_candidates:
+            serialized_expense = _serialize_duplicate_expense_for_import_review(expense)
+            serialized_expense["comparison"] = _build_duplicate_expense_comparison(
+                expense,
+                {
+                    "import_source_type": import_source_type,
+                    "parsed_visit_date": parsed_visit_date.isoformat() if parsed_visit_date else "",
+                    "parsed_cleared_date": parsed_cleared_date.isoformat() if parsed_cleared_date else "",
+                    "parsed_visit_datetime_utc": parsed_visit_dt_utc.isoformat() if parsed_visit_dt_utc else "",
+                    "has_explicit_time": has_explicit_time,
+                    "amount": f"{abs(amount):.2f}",
+                    "category_name": category_name,
+                    "meal_type": meal_type,
+                    "order_type": order_type,
+                    "party_size": party_size,
+                    "notes": notes,
+                },
+                normalized_tag_names,
+                str(candidate.get("display_name") or ""),
+            )
+            serialized_candidates.append(serialized_expense)
+        duplicates_by_restaurant[str(candidate_id)] = serialized_candidates
+
+    return duplicates_by_restaurant
+
+
+def _serialize_all_duplicate_candidates_for_import_review(
+    user_id: int,
+    amount: Decimal | None,
+    duplicate_match_date: date | None,
+    import_source_type: str,
+    parsed_visit_date: date | None,
+    parsed_cleared_date: date | None,
+    parsed_visit_dt_utc: datetime | None,
+    has_explicit_time: bool,
+    category_name: str,
+    meal_type: str,
+    order_type: str,
+    party_size: str,
+    notes: str,
+    normalized_tag_names: list[str],
+) -> list[dict[str, Any]]:
+    """Build duplicate-candidate payloads without constraining restaurant identity."""
+    if amount is None or duplicate_match_date is None:
+        return []
+
+    serialized_candidates: list[dict[str, Any]] = []
+    for expense in _find_duplicate_candidates_for_import_review_any_restaurant(user_id, amount, duplicate_match_date):
+        matched_restaurant_name = expense.restaurant.display_name if expense.restaurant else ""
+        serialized_expense = _serialize_duplicate_expense_for_import_review(expense)
+        serialized_expense["comparison"] = _build_duplicate_expense_comparison(
+            expense,
+            {
+                "import_source_type": import_source_type,
+                "parsed_visit_date": parsed_visit_date.isoformat() if parsed_visit_date else "",
+                "parsed_cleared_date": parsed_cleared_date.isoformat() if parsed_cleared_date else "",
+                "parsed_visit_datetime_utc": parsed_visit_dt_utc.isoformat() if parsed_visit_dt_utc else "",
+                "has_explicit_time": has_explicit_time,
+                "amount": f"{abs(amount):.2f}",
+                "category_name": category_name,
+                "meal_type": meal_type,
+                "order_type": order_type,
+                "party_size": party_size,
+                "notes": notes,
+            },
+            normalized_tag_names,
+            matched_restaurant_name,
+        )
+        serialized_candidates.append(serialized_expense)
+    return serialized_candidates
+
+
+def _recommend_expense_action_for_duplicates(duplicate_candidates: list[dict[str, Any]]) -> str:
+    """Return the recommended expense action after restaurant selection."""
+    if not duplicate_candidates:
+        return "create"
+
+    has_recommended_update = any(
+        int(candidate.get("comparison", {}).get("change_count", 0) or 0) > 0 for candidate in duplicate_candidates
+    )
+    return "update" if has_recommended_update else "skip"
+
+
+def build_expense_import_review(file: FileStorage, user_id: int) -> tuple[bool, dict[str, Any]]:
+    """Parse an import file into row-by-row review data."""
+    if not _validate_import_file(file):
+        error_msg = "Invalid file type. Please upload a CSV or JSON file."
+        return False, {"message": error_msg, "errors": [error_msg]}
+
+    data, parse_error = _parse_import_file(file)
+    if data is None:
+        error_msg = parse_error or "Error parsing file. Please check the file format."
+        return False, {"message": error_msg, "errors": [error_msg]}
+
+    restaurants = _sort_restaurants_for_import_review(Restaurant.query.filter_by(user_id=user_id).all())
+    existing_tag_names = {tag.name for tag in Tag.query.filter_by(user_id=user_id).all()}
+    review_rows: list[dict[str, Any]] = []
+    importable_count = 0
+    duplicate_row_count = 0
+
+    for row_number, row in enumerate(data, 1):
+        if _is_blank_import_row(row):
+            continue
+
+        payee_name = str(row.get("restaurant_name") or "").strip()
+        restaurant_address = str(row.get("restaurant_address") or "").strip()
+        restaurant_city = str(row.get("restaurant_city") or "").strip()
+        restaurant_state = str(row.get("restaurant_state") or "").strip()
+        restaurant_postal_code = str(row.get("restaurant_postal_code") or "").strip()
+        category_name = _normalize_import_category_name(row.get("category_name"))
+        notes = str(row.get("notes") or "").strip()
+        tags_value = str(row.get("tags") or "").strip()
+        meal_type = str(row.get("meal_type") or "").strip()
+        order_type = str(row.get("order_type") or "").strip()
+        party_size = str(row.get("party_size") or "").strip()
+
+        row_errors: list[str] = []
+        row_warnings: list[str] = []
+        import_source_type = _detect_import_source_type(row)
+        parsed_visit_dt_utc, parsed_visit_date, parsed_cleared_date, date_error = _parse_import_review_dates(
+            row, import_source_type
+        )
+        has_explicit_time = import_source_type == "standard" and _import_row_has_explicit_time(row)
+        if date_error:
+            row_errors.append(date_error)
+
+        amount, amount_error = _parse_expense_amount(str(row.get("amount", "")).strip())
+        if amount_error:
+            row_errors.append(amount_error)
+
+        tag_names, tag_error = _parse_import_tags(row.get("tags"))
+        if tag_error:
+            row_errors.append(tag_error)
+            tag_names = []
+
+        if not payee_name:
+            row_errors.append("Restaurant / payee is required for import review.")
+
+        restaurant_candidates = (
+            _find_restaurant_candidates_for_import_review(payee_name, restaurant_address, restaurants)
+            if payee_name
+            else []
+        )
+        exact_display_name_candidates = [
+            candidate for candidate in restaurant_candidates if candidate.get("exact_display_name_match")
+        ]
+        if len(exact_display_name_candidates) == 1:
+            suggested_restaurant_id = exact_display_name_candidates[0]["id"]
+        elif len(restaurant_candidates) == 1:
+            suggested_restaurant_id = restaurant_candidates[0]["id"]
+        else:
+            suggested_restaurant_id = None
+        requires_restaurant_confirmation = len(restaurant_candidates) > 1 and suggested_restaurant_id is None
+
+        duplicate_match_date = parsed_visit_date if import_source_type == "standard" else parsed_cleared_date
+        normalized_tag_names = _normalize_import_tag_names(tag_names or [])
+        duplicate_candidates_by_restaurant = _serialize_duplicate_candidates_by_restaurant(
+            user_id=user_id,
+            restaurant_candidates=restaurant_candidates,
+            amount=amount,
+            duplicate_match_date=duplicate_match_date,
+            import_source_type=import_source_type,
+            parsed_visit_date=parsed_visit_date,
+            parsed_cleared_date=parsed_cleared_date,
+            parsed_visit_dt_utc=parsed_visit_dt_utc,
+            has_explicit_time=has_explicit_time,
+            category_name=category_name,
+            meal_type=meal_type,
+            order_type=order_type,
+            party_size=party_size,
+            notes=notes,
+            normalized_tag_names=normalized_tag_names,
+        )
+        all_duplicate_candidates = _serialize_all_duplicate_candidates_for_import_review(
+            user_id=user_id,
+            amount=amount,
+            duplicate_match_date=duplicate_match_date,
+            import_source_type=import_source_type,
+            parsed_visit_date=parsed_visit_date,
+            parsed_cleared_date=parsed_cleared_date,
+            parsed_visit_dt_utc=parsed_visit_dt_utc,
+            has_explicit_time=has_explicit_time,
+            category_name=category_name,
+            meal_type=meal_type,
+            order_type=order_type,
+            party_size=party_size,
+            notes=notes,
+            normalized_tag_names=normalized_tag_names,
+        )
+        duplicate_candidates = (
+            duplicate_candidates_by_restaurant.get(str(suggested_restaurant_id), []) if suggested_restaurant_id else []
+        )
+        warning_candidates: list[dict[str, Any]] = list(duplicate_candidates)
+
+        if (
+            import_source_type == "simplifi"
+            and parsed_cleared_date is not None
+            and amount is not None
+            and suggested_restaurant_id is not None
+        ):
+            extended_warning_candidates = _find_duplicate_candidates_for_import_review(
+                user_id=user_id,
+                restaurant_id=int(suggested_restaurant_id),
+                amount=amount,
+                expense_date=parsed_cleared_date,
+                window_days=14,
+            )
+            seen_warning_ids = {
+                candidate_id
+                for candidate in warning_candidates
+                for candidate_id in [candidate.get("id")]
+                if isinstance(candidate_id, int)
+            }
+            for candidate in extended_warning_candidates:
+                if candidate.id in seen_warning_ids:
+                    continue
+                warning_candidates.append(_serialize_duplicate_expense_for_import_review(candidate))
+                seen_warning_ids.add(candidate.id)
+
+        direct_warning = _build_cleared_date_warning(parsed_visit_date, parsed_cleared_date)
+        if direct_warning:
+            row_warnings.append(direct_warning)
+
+        if parsed_cleared_date is not None:
+            for expense in warning_candidates:
+                candidate_visit_date_raw = str(expense.get("visit_date") or expense.get("date") or "").strip()
+                candidate_visit_date = (
+                    date.fromisoformat(candidate_visit_date_raw) if candidate_visit_date_raw else None
+                )
+                candidate_warning = _build_cleared_date_warning(
+                    candidate_visit_date,
+                    parsed_cleared_date,
+                    f"Expense #{expense.get('id')}",
+                )
+                if candidate_warning:
+                    row_warnings.append(candidate_warning)
+
+        if any(duplicate_candidates_by_restaurant.values()):
+            duplicate_row_count += 1
+
+        default_decision = "skip"
+        if not row_errors:
+            if requires_restaurant_confirmation:
+                default_decision = "skip"
+            elif duplicate_candidates:
+                default_decision = "skip"
+            elif suggested_restaurant_id is not None:
+                default_decision = "match"
+
+        restaurant_default_action = "match"
+        expense_default_action = "skip"
+        if not row_errors:
+            if suggested_restaurant_id is not None:
+                restaurant_default_action = "match"
+            elif requires_restaurant_confirmation:
+                restaurant_default_action = "match"
+            if suggested_restaurant_id is not None:
+                expense_default_action = _recommend_expense_action_for_duplicates(duplicate_candidates)
+            elif requires_restaurant_confirmation:
+                expense_default_action = "skip"
+
+        if not row_errors and suggested_restaurant_id is not None:
+            importable_count += 1
+
+        existing_review_tags = [tag_name for tag_name in normalized_tag_names if tag_name in existing_tag_names]
+        new_review_tags = [tag_name for tag_name in normalized_tag_names if tag_name not in existing_tag_names]
+
+        review_rows.append(
+            {
+                "row_number": row_number,
+                "import_source_type": import_source_type,
+                "source": {
+                    "date": str(row.get("date") or ""),
+                    "visit_date": str(row.get("visit_date") or ""),
+                    "cleared_date": str(row.get("cleared_date") or ""),
+                    "amount": str(row.get("amount") or ""),
+                    "restaurant_name": payee_name,
+                    "restaurant_address": restaurant_address,
+                    "restaurant_city": restaurant_city,
+                    "restaurant_state": restaurant_state,
+                    "restaurant_postal_code": restaurant_postal_code,
+                    "category_name": category_name,
+                    "meal_type": meal_type,
+                    "order_type": order_type,
+                    "party_size": party_size,
+                    "notes": notes,
+                    "tags": tags_value,
+                },
+                "parsed_date": (
+                    parsed_primary_date.isoformat()
+                    if (parsed_primary_date := (parsed_visit_date or parsed_cleared_date)) is not None
+                    else ""
+                ),
+                "parsed_visit_date": parsed_visit_date.isoformat() if parsed_visit_date else "",
+                "parsed_cleared_date": parsed_cleared_date.isoformat() if parsed_cleared_date else "",
+                "parsed_datetime_utc": parsed_visit_dt_utc.isoformat() if parsed_visit_dt_utc else "",
+                "parsed_visit_datetime_utc": parsed_visit_dt_utc.isoformat() if parsed_visit_dt_utc else "",
+                "parsed_time_display": (
+                    parsed_visit_dt_utc.strftime("%H:%M UTC") if parsed_visit_dt_utc and has_explicit_time else ""
+                ),
+                "parsed_datetime_display": (
+                    parsed_visit_dt_utc.strftime("%Y-%m-%d %H:%M UTC")
+                    if parsed_visit_dt_utc and has_explicit_time
+                    else ""
+                ),
+                "has_explicit_time": has_explicit_time,
+                "amount": f"{abs(amount):.2f}" if amount is not None else "",
+                "restaurant_address": restaurant_address,
+                "restaurant_city": restaurant_city,
+                "restaurant_state": restaurant_state,
+                "restaurant_postal_code": restaurant_postal_code,
+                "category_name": category_name,
+                "meal_type": meal_type,
+                "order_type": order_type,
+                "party_size": party_size,
+                "notes": notes,
+                "tags": ", ".join(tag_names or []),
+                "tag_count": len(normalized_tag_names),
+                "tag_existing_count": len(existing_review_tags),
+                "tag_new_count": len(new_review_tags),
+                "tag_existing_names": existing_review_tags,
+                "tag_new_names": new_review_tags,
+                "restaurant_name": payee_name,
+                "restaurant_candidates": [restaurant for restaurant in restaurant_candidates],
+                "suggested_restaurant_id": suggested_restaurant_id,
+                "duplicate_candidates": duplicate_candidates,
+                "duplicate_candidates_by_restaurant": duplicate_candidates_by_restaurant,
+                "all_duplicate_candidates": all_duplicate_candidates,
+                "error_messages": row_errors,
+                "warning_messages": row_warnings,
+                "default_decision": default_decision,
+                "restaurant_default_action": restaurant_default_action,
+                "expense_default_action": expense_default_action,
+                "can_create_restaurant": bool(payee_name),
+                "restaurant_requires_confirmation": requires_restaurant_confirmation,
+            }
+        )
+
+    return True, {
+        "review_rows": review_rows,
+        "total_rows": len(review_rows),
+        "importable_rows": importable_count,
+        "duplicate_rows": duplicate_row_count,
+    }
+
+
+def apply_expense_import_review(
+    review_rows: list[dict[str, Any]], form_data: dict[str, Any], user_id: int
+) -> dict[str, Any]:
+    """Apply row-by-row decisions from an import review draft."""
+    imported_count = 0
+    updated_count = 0
+    skipped_count = 0
+    error_messages: list[str] = []
+    restaurants_by_id = {restaurant.id: restaurant for restaurant in Restaurant.query.filter_by(user_id=user_id).all()}
+
+    existing_tags = {tag.name: tag for tag in Tag.query.filter_by(user_id=user_id).all()}
+    created_tags: set[str] = set()
+    tag_counts: dict[str, int] = {}
+    has_apply_row_controls = any(str(key).startswith("apply_row_") for key in form_data)
+
+    for review_row in review_rows:
+        row_number = int(review_row["row_number"])
+        if has_apply_row_controls and form_data.get(f"apply_row_{row_number}") != "1":
+            skipped_count += 1
+            continue
+
+        restaurant_action = str(
+            form_data.get(
+                f"restaurant_action_{row_number}",
+                review_row.get("restaurant_default_action", "skip"),
+            )
+            or "skip"
+        )
+        expense_action = str(
+            form_data.get(
+                f"expense_action_{row_number}",
+                review_row.get("expense_default_action", "skip"),
+            )
+            or "skip"
+        )
+        decision = str(form_data.get(f"decision_{row_number}", review_row.get("default_decision", "skip")) or "skip")
+
+        if f"restaurant_action_{row_number}" not in form_data and f"expense_action_{row_number}" not in form_data:
+            if decision == "skip":
+                restaurant_action = "skip"
+                expense_action = "skip"
+            elif decision == "update":
+                restaurant_action = "match"
+                expense_action = "update"
+            elif decision == "match":
+                restaurant_action = "match"
+                expense_action = "create"
+            elif decision == "create":
+                restaurant_action = "match"
+                expense_action = "create"
+
+        if expense_action == "skip":
+            skipped_count += 1
+            continue
+
+        if review_row.get("error_messages"):
+            error_messages.append(f"Row {row_number}: Cannot import until parsing errors are resolved.")
+            continue
+
+        import_source_type = str(review_row.get("import_source_type") or "standard")
+        parsed_visit_date_raw = str(review_row.get("parsed_visit_date") or "").strip()
+        parsed_cleared_date_raw = str(review_row.get("parsed_cleared_date") or "").strip()
+        parsed_datetime_raw = str(
+            review_row.get("parsed_visit_datetime_utc") or review_row.get("parsed_datetime_utc") or ""
+        ).strip()
+        amount_raw = str(review_row.get("amount") or "").strip()
+        if (not parsed_visit_date_raw and not parsed_cleared_date_raw) or not amount_raw:
+            error_messages.append(f"Row {row_number}: Missing parsed date or amount.")
+            continue
+
+        parsed_visit_date = date.fromisoformat(parsed_visit_date_raw) if parsed_visit_date_raw else None
+        parsed_cleared_date = date.fromisoformat(parsed_cleared_date_raw) if parsed_cleared_date_raw else None
+        amount = Decimal(amount_raw)
+        has_explicit_time = bool(review_row.get("has_explicit_time"))
+
+        if restaurant_action == "skip":
+            error_messages.append(
+                f"Row {row_number}: Reconcile the restaurant before importing or updating the expense."
+            )
+            continue
+
+        restaurant: Restaurant | None = None
+        update_expense: Expense | None = None
+        pending_restaurant_id_raw = str(form_data.get(f"restaurant_id_{row_number}", "") or "").strip()
+        if restaurant_action != "match":
+            error_messages.append(f"Row {row_number}: Select a matched restaurant before applying changes.")
+            continue
+        if pending_restaurant_id_raw.isdigit():
+            restaurant = restaurants_by_id.get(int(pending_restaurant_id_raw))
+            if restaurant is None:
+                error_messages.append(f"Row {row_number}: Selected restaurant was not found.")
+                continue
+        else:
+            error_messages.append(f"Row {row_number}: Select a restaurant match before applying expense changes.")
+            continue
+
+        if expense_action == "update":
+            update_expense_id_raw = str(form_data.get(f"update_expense_id_{row_number}", "") or "").strip()
+            if not update_expense_id_raw.isdigit():
+                error_messages.append(f"Row {row_number}: Select an existing expense to update.")
+                continue
+
+            duplicate_match_date = parsed_visit_date if import_source_type == "standard" else parsed_cleared_date
+            if duplicate_match_date is None or restaurant.id is None:
+                error_messages.append(f"Row {row_number}: Unable to validate duplicate expense candidates.")
+                continue
+            allowed_expense_ids = {
+                expense.id
+                for expense in _find_duplicate_candidates_for_import_review(
+                    user_id=user_id,
+                    restaurant_id=restaurant.id,
+                    amount=amount,
+                    expense_date=duplicate_match_date,
+                )
+            }
+            update_expense_id = int(update_expense_id_raw)
+            if update_expense_id not in allowed_expense_ids:
+                error_messages.append(f"Row {row_number}: Selected expense is not a valid update target for this row.")
+                continue
+
+            update_expense = (
+                Expense.query.options(
+                    joinedload(Expense.restaurant),
+                    joinedload(Expense.category),
+                    joinedload(Expense.expense_tags).joinedload(ExpenseTag.tag),
+                )
+                .filter_by(id=update_expense_id, user_id=user_id)
+                .first()
+            )
+            if update_expense is None:
+                error_messages.append(f"Row {row_number}: Selected expense was not found.")
+                continue
+            if restaurant is None:
+                restaurant = update_expense.restaurant
+        elif restaurant is None:
+            error_messages.append(f"Row {row_number}: Select a restaurant match before importing the expense.")
+            continue
+        elif expense_action != "create":
+            error_messages.append(f"Row {row_number}: Unsupported expense action '{expense_action}'.")
+            continue
+
+        category = _find_category_by_name(_normalize_import_category_name(review_row.get("category_name")), user_id)
+        expense_datetime: datetime | None = None
+        if parsed_visit_date is not None:
+            expense_datetime = _build_import_expense_datetime(
+                parsed_visit_date,
+                parsed_datetime_raw,
+                has_explicit_time,
+                update_expense,
+            )
+        elif import_source_type == "simplifi" and parsed_cleared_date is not None and update_expense is None:
+            # New Simplifi rows have a cleared date but no known visit date yet; fall back to the cleared date.
+            expense_datetime = _build_import_expense_datetime(parsed_cleared_date, "", False, None)
+        normalized_notes = str(review_row.get("notes") or "").strip() or None
+        normalized_meal_type = str(review_row.get("meal_type") or "").strip() or None
+        normalized_order_type = str(review_row.get("order_type") or "").strip() or None
+        party_size_raw = str(review_row.get("party_size") or "").strip()
+        parsed_party_size = int(party_size_raw) if party_size_raw.isdigit() else None
+        tag_names, tag_error = _parse_import_tags(review_row.get("tags"))
+        if tag_error:
+            error_messages.append(f"Row {row_number}: Tags error: {tag_error}")
+            continue
+        normalized_tags = _normalize_import_tag_names(tag_names or [])
+
+        if update_expense is not None:
+            if expense_datetime is not None and (import_source_type == "standard" or parsed_visit_date is not None):
+                update_expense.date = expense_datetime
+            update_expense.cleared_date = parsed_cleared_date
+            update_expense.amount = amount
+            update_expense.notes = normalized_notes
+            update_expense.meal_type = normalized_meal_type
+            update_expense.order_type = normalized_order_type
+            update_expense.category = category if category else None
+            update_expense.party_size = parsed_party_size
+            if restaurant is not None:
+                update_expense.restaurant = restaurant
+            _replace_import_tags_on_expense(
+                update_expense,
+                user_id,
+                normalized_tags,
+                existing_tags,
+                created_tags,
+                tag_counts,
+            )
+            updated_count += 1
+            continue
+
+        expense = Expense(
+            user_id=user_id,
+            date=expense_datetime if expense_datetime is not None else datetime.now(UTC),
+            cleared_date=parsed_cleared_date,
+            amount=amount,
+            notes=normalized_notes,
+            meal_type=normalized_meal_type,
+            order_type=normalized_order_type,
+            category=category if category else None,
+            restaurant=restaurant,
+            party_size=parsed_party_size,
+        )
+        db.session.add(expense)
+        imported_count += 1
+        _apply_import_tags_to_expense(expense, user_id, normalized_tags, existing_tags, created_tags, tag_counts)
+
+    if error_messages:
+        db.session.rollback()
+        return {
+            "success": False,
+            "imported_count": 0,
+            "updated_count": 0,
+            "skipped_count": skipped_count,
+            "errors": error_messages,
+        }
+
+    db.session.commit()
+    return {
+        "success": True,
+        "imported_count": imported_count,
+        "updated_count": updated_count,
+        "skipped_count": skipped_count,
+        "errors": [],
+    }
 
 
 # Tag Services

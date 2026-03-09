@@ -146,8 +146,7 @@ repos:
           - prettier@3.8.1
         files: \.(md|json|ya?ml)$
 
-  # HTML linting with prettier (matches make lint-html)
-  # Uses npm script to ensure consistency with make lint
+  # Static HTML linting with prettier (matches make lint-html for app/static/*.html only)
   - repo: local
     hooks:
       - id: prettier-html
@@ -164,6 +163,21 @@ repos:
           fi'
         language: system
         types: [html]
+        files: ^app/static/.*\.html$
+        require_serial: true
+
+  # Jinja template syntax check for Flask templates
+  - repo: local
+    hooks:
+      - id: jinja-template-syntax
+        name: jinja-template-syntax
+        entry: >
+          bash -c 'REPO="$(git rev-parse --show-toplevel)" && cd "$REPO" &&
+          if [ -f "./venv/bin/python3" ]; then PYTHON=./venv/bin/python3;
+          elif command -v python3 >/dev/null 2>&1; then PYTHON=python3;
+          else echo "No Python found"; exit 1; fi &&
+          $PYTHON scripts/check_jinja_templates.py'
+        language: system
         files: ^app/templates/.*\.html$
         require_serial: true
 

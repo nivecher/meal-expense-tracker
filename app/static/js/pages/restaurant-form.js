@@ -21,6 +21,7 @@ function getCSRFToken() {
 
 // Import toast functions
 import { toast } from '../utils/notifications.js';
+import { attachIntlPhoneFormatting } from '../utils/contact-fields.js';
 
 function updateWebsiteButton() {
   const websiteField = document.getElementById('website');
@@ -64,6 +65,35 @@ function updateValidateButton() {
   }
 
   updatePlaceIdActions();
+}
+
+function getSelectedMerchantChainState() {
+  const merchantInput = document.getElementById('merchant_name');
+  if (!(merchantInput instanceof HTMLInputElement)) {
+    return false;
+  }
+
+  return merchantInput.dataset.merchantIsChain === 'true';
+}
+
+function updateLocationNameRequirement() {
+  const locationNameField = document.getElementById('location_name');
+  const requiredIndicator = document.getElementById('location-name-required-indicator');
+  const chainHelp = document.getElementById('location-name-chain-help');
+  const isChainMerchant = getSelectedMerchantChainState();
+
+  if (locationNameField instanceof HTMLInputElement) {
+    locationNameField.required = isChainMerchant;
+    locationNameField.setAttribute('aria-required', isChainMerchant ? 'true' : 'false');
+  }
+
+  if (requiredIndicator) {
+    requiredIndicator.classList.toggle('d-none', !isChainMerchant);
+  }
+
+  if (chainHelp) {
+    chainHelp.classList.toggle('d-none', !isChainMerchant);
+  }
 }
 
 function showValidationLoading() {
@@ -920,6 +950,8 @@ function clearValidationOnFieldEdit(event) {
 
 // Initialize restaurant form event handlers
 function initRestaurantForm() {
+  attachIntlPhoneFormatting('#restaurantForm', ['phone']);
+
   // Set up website field monitoring
   const websiteField = document.getElementById('website');
   if (websiteField) {
@@ -976,6 +1008,22 @@ function initRestaurantForm() {
   if (dismissBtn) {
     dismissBtn.addEventListener('click', hideReconciliationPanel);
   }
+
+  const searchInput = document.getElementById('restaurant-search');
+  if (searchInput instanceof HTMLInputElement) {
+    const initialQuery = searchInput.dataset.initialQuery?.trim() || '';
+    if (initialQuery && !searchInput.dataset.initialQueryApplied) {
+      searchInput.dataset.initialQueryApplied = 'true';
+      window.setTimeout(() => {
+        searchInput.dispatchEvent(new Event('input', { bubbles: true }));
+      }, 250);
+    }
+  }
+
+  updateLocationNameRequirement();
+
+  document.addEventListener('merchant-selected', updateLocationNameRequirement);
+  document.addEventListener('merchant-cleared', updateLocationNameRequirement);
 }
 
 // Run init when DOM is ready (handles both normal and deferred/module load timing)

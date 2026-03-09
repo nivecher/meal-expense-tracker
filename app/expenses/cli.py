@@ -10,7 +10,7 @@ from flask.cli import with_appcontext
 
 from app.auth.models import User
 from app.constants.categories import get_default_categories
-from app.expenses.models import Category
+from app.expenses.models import Category, Expense
 from app.extensions import db
 
 
@@ -19,14 +19,21 @@ def category_cli() -> None:
     """Category management commands."""
 
 
+@click.group("receipt", context_settings={"help_option_names": ["-h", "--help"]})
+def receipt_cli() -> None:
+    """Receipt maintenance commands."""
+
+
 def register_commands(app: Flask) -> None:
     """Register CLI commands with the application."""
     # Register the category command group
     app.cli.add_command(category_cli)
+    app.cli.add_command(receipt_cli)
 
     # Add commands to the category group
     category_cli.add_command(reinit_categories)
     category_cli.add_command(list_categories)
+    receipt_cli.add_command(backfill_receipts)
 
 
 def _sort_categories_by_default_order(categories: list[Category]) -> list[Category]:
@@ -236,3 +243,41 @@ def list_categories(user_id: int | None, username: str | None, all_users: bool) 
         else:
             click.echo("   (No categories)")
         click.echo()
+
+
+@click.command("backfill")
+@click.option("--dry-run", is_flag=True, help="Show what would change without writing to the database")
+@with_appcontext
+def backfill_receipts(dry_run: bool) -> None:
+    """Create structured Receipt rows for legacy expense receipt_image records."""
+    from app.expenses.services import _get_receipt_record_for_expense, _upsert_receipt_record_for_expense
+
+    expenses = (
+        Expense.query.filter(Expense.receipt_image.is_not(None)).order_by(Expense.user_id.asc(), Expense.id.asc()).all()
+    )
+
+    created = 0
+    skipped = 0
+    for expense in expenses:
+        if _get_receipt_record_for_expense(expense) is not None:
+            skipped += 1
+            continue
+        if dry_run:
+            created += 1
+            continue
+        if expense.receipt_image:
+            _upsert_receipt_record_for_expense(expense, expense.receipt_image)
+            created += 1
+
+    if dry_run:
+        db.session.rollback()
+        click.echo(f"Would create {created} structured receipt row(s); skipped {skipped} existing row(s).")
+        return
+
+    try:
+        db.session.commit()
+        click.echo(f"Created {created} structured receipt row(s); skipped {skipped} existing row(s).")
+    except Exception as exc:
+        db.session.rollback()
+        click.echo(f"Failed to backfill receipts: {exc}")
+        raise

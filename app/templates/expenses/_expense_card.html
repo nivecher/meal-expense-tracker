@@ -1,0 +1,172 @@
+{% from 'macros/badge_helpers.html' import cuisine_badge, meal_type_badge, order_type_badge, service_level_badge %} {%
+from 'macros/tag_helpers.html' import tag_badge %}
+<div class="col">
+    <div class="card h-100 shadow-sm">
+        <div class="card-body">
+            <div class="row expense-card-top-row mb-3">
+                <div class="col-8 expense-card-restaurant-col">
+                    <div class="d-flex align-items-start">
+                        <div class="restaurant-icon me-2 flex-shrink-0">
+                            {% if expense.restaurant and expense.restaurant.website %}
+                            <img
+                                src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"
+                                data-website="{{ expense.restaurant.website }}"
+                                data-size="32"
+                                alt="{{ expense.restaurant.display_name if expense.restaurant else 'Unknown Restaurant' }} icon"
+                                class="restaurant-favicon"
+                                width="32"
+                                height="32"
+                                style="opacity: 0; transition: opacity 0.2s ease-in-out" />
+                            {% endif %}
+                            <i
+                                class="fas fa-utensils text-primary restaurant-fallback-icon{% if expense.restaurant and expense.restaurant.website %} d-none{% endif %}"></i>
+                        </div>
+                        <div class="flex-grow-1 min-w-0">
+                            <h5 class="card-title mb-2 expense-card-title">
+                                <a
+                                    href="{{ url_for('expenses.expense_details', expense_id=expense.id) }}"
+                                    class="text-decoration-none text-dark">
+                                    {% if expense.restaurant %} {{ expense.restaurant.display_name if expense.restaurant
+                                    else 'Unknown Restaurant' }} {% else %} Unknown Restaurant {% endif %}
+                                </a>
+                            </h5>
+                            <div class="d-flex flex-wrap gap-2 mb-2 expense-card-badges-row">
+                                {{ cuisine_badge(expense.restaurant.cuisine if expense.restaurant else None, size='sm')
+                                }} {% if expense.restaurant and expense.restaurant.service_level %} {{
+                                service_level_badge(expense.restaurant.service_level, size='sm') }} {% endif %}
+                            </div>
+                            <div class="d-flex flex-wrap gap-2 mb-2 expense-card-badges-row">
+                                {% if expense.meal_type %} {{ meal_type_badge(expense.meal_type, size='sm') }} {% endif
+                                %} {% if expense.order_type %} {{ order_type_badge(expense.order_type, size='sm') }} {%
+                                endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-4 text-end expense-card-amount-col">
+                    <div class="fw-bold text-success fs-5 mb-2 expense-card-amount">
+                        {{ expense.amount|format_currency_usd }}
+                    </div>
+                    {% if expense.party_size and expense.party_size > 1 %}
+                    <div
+                        class="badge bg-info text-white expense-card-party-badge mb-1 d-inline-block"
+                        data-bs-toggle="tooltip"
+                        data-bs-placement="top"
+                        title="{{ expense.party_size }} people">
+                        <i class="fas fa-users me-1"></i>{{ expense.party_size }}
+                    </div>
+                    <div class="text-muted small d-block" data-bs-toggle="tooltip" title="Price per person"
+                        >{{ expense.price_per_person|format_currency_usd }} / person</div
+                    >
+                    {% elif expense.party_size and expense.party_size == 1 %}
+                    <div
+                        class="badge bg-info text-white expense-card-party-badge d-inline-block"
+                        data-bs-toggle="tooltip"
+                        data-bs-placement="top"
+                        title="1 person">
+                        <i class="fas fa-user me-1"></i>1
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+            {% if expense.tags or expense.notes or expense.receipt_storage_path %}
+            <div class="row mb-1">
+                <div class="col-8">
+                    {% if expense.tags %}
+                    <div class="d-flex align-items-start">
+                        <i class="fas fa-tags me-2 text-muted mt-1"></i>
+                        <div class="expense-tags">
+                            {% for tag in expense.tags %} {{ tag_badge(tag) }} {% endfor %}
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+                <div class="col-4">
+                    <div class="text-muted small text-end">
+                        {% if expense.receipt_storage_path %}
+                        <div class="mb-1">
+                            <a
+                                href="{{ get_receipt_url(expense.receipt_storage_path) }}"
+                                target="_blank"
+                                class="text-decoration-none"
+                                data-bs-toggle="tooltip"
+                                data-bs-placement="top"
+                                title="View receipt">
+                                <i class="fas fa-receipt text-info me-1"></i>
+                                <span class="fst-italic">Receipt</span>
+                            </a>
+                        </div>
+                        {% endif %} {% if expense.notes %}
+                        <div>
+                            <i
+                                class="fas fa-sticky-note text-warning me-1"
+                                data-bs-toggle="tooltip"
+                                data-bs-placement="top"
+                                title="{{ expense.notes }}"></i>
+                            <span class="fst-italic">Note</span>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+            <div class="row expense-card-bottom-row pt-0 border-top">
+                <div class="col-8 expense-card-location-col">
+                    <div class="text-muted small expense-card-address-line d-flex align-items-center gap-2">
+                        {% if expense.restaurant %}
+                        <i class="fas fa-map-marker-alt flex-shrink-0"></i>
+                        <span
+                            class="expense-card-address-text text-truncate"
+                            title="{% if expense.restaurant.address %}{{ expense.restaurant.address }}{% elif expense.restaurant.city and expense.restaurant.state %}{{ expense.restaurant.city }}, {{ expense.restaurant.state }}{% elif expense.restaurant.city %}{{ expense.restaurant.city }}{% endif %}">
+                            {% if expense.restaurant.city and expense.restaurant.state %} {{ expense.restaurant.city }},
+                            {{ expense.restaurant.state }} {% elif expense.restaurant.city %} {{ expense.restaurant.city
+                            }} {% elif expense.restaurant.address %} {{ expense.restaurant.address }} {% else %}
+                            Restaurant {% endif %}
+                        </span>
+                        {% if expense.restaurant.get_google_maps_url() %}
+                        <a
+                            href="{{ expense.restaurant.get_google_maps_url() }}"
+                            class="text-decoration-none text-primary flex-shrink-0"
+                            data-bs-toggle="tooltip"
+                            title="View on Google Maps">
+                            <i class="fas fa-map-marked-alt"></i>
+                        </a>
+                        {% endif %} {% endif %}
+                    </div>
+                    <div class="text-muted small mt-1">
+                        <i class="far fa-calendar-alt me-1"></i>
+                        {{ expense.date|format_date_user_tz('%B %d, %Y') }}
+                    </div>
+                    <div class="text-muted small mb-0">
+                        <i class="fas fa-clock me-1"></i>
+                        {{ expense.date|format_time_with_tz }}
+                    </div>
+                </div>
+                <div class="col-4">
+                    <div class="d-flex gap-2 justify-content-end">
+                        <a
+                            href="{{ url_for('expenses.edit_expense', expense_id=expense.id) }}"
+                            class="btn btn-sm btn-outline-primary"
+                            data-bs-toggle="tooltip"
+                            title="Edit expense">
+                            <i class="fas fa-edit"></i>
+                        </a>
+                        <button
+                            type="button"
+                            class="btn btn-sm btn-outline-danger"
+                            data-bs-toggle="modal"
+                            data-bs-target="#deleteExpenseModal"
+                            data-expense-id="{{ expense.id }}"
+                            data-expense-description="{{ expense.restaurant.display_name if expense.restaurant else 'Unknown Restaurant' }}"
+                            data-expense-amount="{{ expense.amount|format_number(2) }}"
+                            data-expense-date="{{ expense.date|format_date_user_tz('%B %d, %Y') }}"
+                            data-tooltip="true"
+                            title="Delete expense">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

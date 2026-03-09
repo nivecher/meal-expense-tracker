@@ -3,7 +3,68 @@
  * Handles progress bar initialization and edit mode navigation
  */
 
+import { attachIntlPhoneFormatting } from '../utils/contact-fields.js';
+
+function isSafeInternalUrl(url) {
+  if (!url) return false;
+
+  try {
+    const parsed = new URL(url, window.location.origin);
+    return parsed.origin === window.location.origin && parsed.pathname.startsWith('/');
+  } catch {
+    return false;
+  }
+}
+
+function navigateToRestaurant(restaurantId, search = '') {
+  if (!restaurantId) return;
+  window.location.assign(`/restaurants/${encodeURIComponent(restaurantId)}${search}`);
+}
+
+function handleExpenseDeleteSubmit(event) {
+  const form = event.target;
+  if (!(form instanceof HTMLFormElement) || !form.action) return;
+  if (!form.action.includes('/expenses/') || !form.action.includes('/delete')) return;
+
+  const expenseHistory = document.getElementById('expense-history');
+  const restaurantId = expenseHistory?.getAttribute('data-restaurant-id');
+  if (!restaurantId) return;
+
+  event.preventDefault();
+
+  const submitButton = form.querySelector('button[type="submit"]');
+  if (submitButton) {
+    submitButton.disabled = true;
+    submitButton.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Deleting...';
+  }
+
+  const formData = new FormData(form);
+  fetch(form.action, {
+    method: 'POST',
+    body: formData,
+  })
+    .then((response) => {
+      if (response.redirected && isSafeInternalUrl(response.url)) {
+        window.location.assign(response.url);
+        return;
+      }
+      navigateToRestaurant(restaurantId);
+    })
+    .catch(() => {
+      navigateToRestaurant(restaurantId);
+    })
+    .finally(() => {
+      const submitButton = form.querySelector('button[type="submit"]');
+      if (submitButton) {
+        submitButton.disabled = false;
+        submitButton.innerHTML = '<i class="fas fa-trash-alt me-1"></i>Delete Expense';
+      }
+    });
+}
+
 export function initRestaurantDetail() {
+  attachIntlPhoneFormatting('#restaurant-form', ['phone']);
+
   // Set progress bar width from data attribute
   const progressBar = document.querySelector('[data-width]');
   if (progressBar) {
@@ -16,7 +77,7 @@ export function initRestaurantDetail() {
     editBtn.addEventListener('click', () => {
       const { restaurantId } = editBtn.dataset;
       if (restaurantId) {
-        window.location.href = `/restaurants/${restaurantId}?edit=True`;
+        navigateToRestaurant(restaurantId, '?edit=True');
       }
     });
   }
@@ -27,7 +88,7 @@ export function initRestaurantDetail() {
     cancelEditBtn.addEventListener('click', () => {
       const { restaurantId } = cancelEditBtn.dataset;
       if (restaurantId) {
-        window.location.href = `/restaurants/${restaurantId}`;
+        navigateToRestaurant(restaurantId);
       }
     });
   }
@@ -110,6 +171,15 @@ export function initRestaurantDetail() {
       const restaurantName = deleteButton.getAttribute('data-restaurant-name') || '';
       openRestaurantDeleteModal(restaurantId, restaurantName);
     });
+  }
+
+  // Intercept expense delete form submit so we can reload the detail page after delete
+  const expenseHistory = document.getElementById('expense-history');
+  if (expenseHistory) {
+    const restaurantId = expenseHistory.getAttribute('data-restaurant-id');
+    if (restaurantId) {
+      document.addEventListener('submit', handleExpenseDeleteSubmit);
+    }
   }
 }
 

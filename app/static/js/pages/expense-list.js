@@ -587,6 +587,30 @@ function initExpenseMonthToggles() {
   });
 }
 
+// --- Infinite scroll chunk: move card/table rows from buffer into list ---
+function redistributeExpenseChunkBuffer(container) {
+  if (!container || !container.classList?.contains('expense-chunk-buffer')) return;
+  const cardView = document.getElementById('card-view-container');
+  const tableBody = document.querySelector('#expenseTable tbody');
+  const cardsWrapper = container.querySelector('.expense-chunk-cards');
+  const tableRowsTemplate = container.querySelector('template.expense-chunk-table-rows');
+  const sentinel = container.querySelector('.expense-load-more-sentinel');
+
+  if (cardView && cardsWrapper) {
+    const cols = cardsWrapper.querySelectorAll(':scope > .col');
+    cols.forEach((col) => cardView.appendChild(col));
+  }
+  if (tableBody && tableRowsTemplate && tableRowsTemplate.content) {
+    const fragment = tableRowsTemplate.content;
+    const rows = fragment.querySelectorAll('tr');
+    rows.forEach((row) => tableBody.appendChild(row.cloneNode(true)));
+  }
+  if (sentinel && container.parentElement) {
+    container.parentElement.appendChild(sentinel);
+  }
+  container.remove();
+}
+
 // --- HTMX re-apply ---
 let reapplyAfterHtmxScheduled = false;
 
@@ -609,6 +633,14 @@ function initHtmxIntegration() {
   function maybeReapply(event) {
     const target = event.detail?.target;
     if (target instanceof HTMLElement) {
+      if (target.id === 'expense-list-chunk-target') {
+        const buffers = target.querySelectorAll(':scope > .expense-chunk-buffer');
+        buffers.forEach((buf) => redistributeExpenseChunkBuffer(buf));
+        if (target.children.length > 0) {
+          scheduleReapplyAfterHtmx();
+        }
+        return;
+      }
       if (target.id === 'expense-list-results' || target.querySelector?.('#expense-list-results')) {
         scheduleReapplyAfterHtmx();
         return;
@@ -629,7 +661,7 @@ function init() {
   initExpenseTabs();
   initViewToggle();
   initDeleteExpense();
-  initFaviconLoading();
+  // Favicon: initial load handled by main.js; initFaviconLoading() runs after HTMX in scheduleReapplyAfterHtmx
   initFilterTagSelector();
   initTagManagerModal();
   initExpenseSelectionActions();

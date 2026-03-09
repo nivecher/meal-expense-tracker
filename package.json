@@ -1,14 +1,14 @@
 {
   "name": "meal-expense-tracker",
-  "version": "0.0.0",
+  "version": "1.0.0",
   "description": "Flask-based meal expense tracking application",
   "private": true,
   "type": "module",
   "scripts": {
     "commitlint": "commitlint --edit",
-    "format-html": "prettier --write \"app/templates/**/*.html\"",
-    "format-html-check": "prettier --check \"app/templates/**/*.html\"",
-    "lint-html": "prettier --check \"app/templates/**/*.html\"",
+    "format-html": "prettier --write \"app/static/**/*.html\"",
+    "format-html-check": "prettier --check \"app/static/**/*.html\"",
+    "lint-html": "prettier --check \"app/static/**/*.html\"",
     "format:css": "stylelint --config .stylelintrc.json \"app/static/css/**/*.css\" --fix",
     "lint:css": "stylelint --config .stylelintrc.json \"app/static/css/**/*.css\"",
     "lint:js": "eslint --config eslint.config.js \"app/static/js/**/*.js\"",

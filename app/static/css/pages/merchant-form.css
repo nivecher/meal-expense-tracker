@@ -1,0 +1,12 @@
+/* Merchant form: favicon preview */
+.favicon-preview-grid {
+  min-height: 2rem;
+}
+
+.favicon-preview-card {
+  min-width: 120px;
+}
+
+.favicon-preview-img-wrap.favicon-preview-failed {
+  color: var(--bs-secondary);
+}

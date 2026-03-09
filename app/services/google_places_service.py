@@ -40,7 +40,7 @@ PLACES_API_BASE = "https://places.googleapis.com/v1/places"
 # FIELD TIERS (for cost tracking):
 # ESSENTIALS: id, formattedAddress, location, addressComponents (Place Details only), types (Place Details only), viewport (Place Details only)
 # PRO: displayName, primaryType, businessStatus, types (for Search), addressComponents (for Search), viewport (for Search), websiteUri, userRatingCount
-# ENTERPRISE: rating, nationalPhoneNumber, priceLevel
+# ENTERPRISE: rating, nationalPhoneNumber. priceLevel is Pro tier per docs (may be deprecated).
 # NOTE: Some fields have different tiers depending on endpoint (Place Details vs Search)
 FIELD_MASKS = {
     # Basic mask - Essentials only (id, formattedAddress, location)
@@ -50,10 +50,10 @@ FIELD_MASKS = {
     # TIER: ESSENTIALS + PRO (places.id, formattedAddress, location, displayName, primaryType, types)
     "search": "places.id,places.formattedAddress,places.location,places.displayName,places.primaryType,places.businessStatus,places.types",
     # Cost-optimized Place Details (default): no Enterprise fields.
-    # Includes fields needed for core add/search workflows while avoiding Enterprise billing.
+    # Includes priceLevel (Pro tier) for service level detection without extra request.
     "place_details": (
         "id,formattedAddress,location,addressComponents,postalAddress,addressDescriptor,"
-        "displayName,primaryType,types,websiteUri"
+        "displayName,primaryType,types,websiteUri,priceLevel"
     ),
     # Full Place Details (Enterprise): opt-in for phone/price/rating enrichment.
     "place_details_enterprise": (
@@ -65,10 +65,10 @@ FIELD_MASKS = {
         "id,formattedAddress,location,addressComponents,displayName,primaryType,businessStatus,"
         "types,rating,nationalPhoneNumber,websiteUri,userRatingCount,viewport"
     ),
-    # CLI validation default (cost-optimized, non-Enterprise)
+    # CLI validation default (cost-optimized, non-Enterprise). priceLevel for service level.
     "cli_validation": (
         "id,formattedAddress,location,addressComponents,postalAddress,addressDescriptor,"
-        "displayName,primaryType,types,websiteUri"
+        "displayName,primaryType,types,websiteUri,priceLevel"
     ),
     # CLI validation with Enterprise fields enabled
     "cli_validation_enterprise": (
@@ -434,12 +434,12 @@ class GooglePlacesService:
         # PRO TIER: Extract business status
         business_status = place_data.get("businessStatus", "")
 
-        # PRO TIER: Extract website (strip UTM/attribution params for canonical URL)
-        from app.utils.url_utils import strip_url_query_params
+        # PRO TIER: Extract website (canonicalize for storage: strip params, lowercase host)
+        from app.utils.url_utils import canonicalize_website_for_storage
 
         website = place_data.get("websiteUri", "")
         if website:
-            website = strip_url_query_params(website) or website
+            website = canonicalize_website_for_storage(website) or website
 
         # PRO TIER: Extract user rating count
         user_rating_count = place_data.get("userRatingCount")
@@ -497,10 +497,53 @@ class GooglePlacesService:
         return None
 
     def _detect_cuisine(self, name: str, types: list[str]) -> str:
-        """Detect cuisine type from name and Google types."""
-        name_lower = name.lower()
+        """Detect cuisine type from name and Google types.
 
-        # Common cuisine patterns in names (return capitalized names to match form validation)
+        Name is checked first for explicit cuisine words (e.g. 'latin', 'tex-mex')
+        so "Gloria's Latin Cuisine" yields Latin American even when types include
+        american_restaurant. Then types are checked in order (first match wins).
+        Then remaining name patterns, with American last.
+        """
+        name_lower = name.lower() if name else ""
+
+        # Name first: explicit cuisine in name overrides generic types
+        name_first_patterns = {"Latin American": ["latin"], "Tex-Mex": ["tex-mex", "tex mex"]}
+        for cuisine, patterns in name_first_patterns.items():
+            if any(p in name_lower for p in patterns):
+                return cuisine
+
+        types_lower = [t.lower() if isinstance(t, str) else "" for t in types]
+
+        # Check Google types in order (first match wins)
+        type_cuisine_map = {
+            "latin_american_restaurant": "Latin American",
+            "tex_mex_restaurant": "Tex-Mex",
+            "italian_restaurant": "Italian",
+            "chinese_restaurant": "Chinese",
+            "mexican_restaurant": "Mexican",
+            "japanese_restaurant": "Japanese",
+            "indian_restaurant": "Indian",
+            "thai_restaurant": "Thai",
+            "french_restaurant": "French",
+            "greek_restaurant": "Greek",
+            "lebanese_restaurant": "Lebanese",
+            "mediterranean_restaurant": "Mediterranean",
+            "middle_eastern_restaurant": "Middle Eastern",
+            "american_restaurant": "American",
+            "pizza_restaurant": "Pizza",
+            "sushi_restaurant": "Sushi",
+            "korean_restaurant": "Korean",
+            "vietnamese_restaurant": "Vietnamese",
+            "spanish_restaurant": "Spanish",
+            "german_restaurant": "German",
+            "turkish_restaurant": "Turkish",
+            "moroccan_restaurant": "Moroccan",
+        }
+        for place_type in types_lower:
+            if place_type in type_cuisine_map:
+                return type_cuisine_map[place_type]
+
+        # Name patterns: more specific before American (Latin/Tex-Mex already handled above)
         cuisine_patterns = {
             "Italian": ["pizza", "pasta", "italian"],
             "Chinese": ["chinese", "china", "wok"],
@@ -513,32 +556,9 @@ class GooglePlacesService:
             "Lebanese": ["lebanese", "lebanon", "shawarma", "hummus"],
             "American": ["burger", "grill", "bbq", "steakhouse"],
         }
-
         for cuisine, patterns in cuisine_patterns.items():
             if any(pattern in name_lower for pattern in patterns):
                 return cuisine
-
-        # Check Google types (return capitalized names to match form validation)
-        type_cuisine_map = {
-            "italian_restaurant": "Italian",
-            "chinese_restaurant": "Chinese",
-            "mexican_restaurant": "Mexican",
-            "japanese_restaurant": "Japanese",
-            "indian_restaurant": "Indian",
-            "thai_restaurant": "Thai",
-            "french_restaurant": "French",
-            "greek_restaurant": "Greek",
-            "lebanese_restaurant": "Lebanese",
-            "mediterranean_restaurant": "Greek",
-            "middle_eastern_restaurant": "Lebanese",
-            "american_restaurant": "American",
-            "pizza_restaurant": "Italian",
-            "sushi_restaurant": "Japanese",
-        }
-
-        for place_type in types:
-            if place_type in type_cuisine_map:
-                return type_cuisine_map[place_type]
 
         return "American"  # Default (capitalized to match form validation)
 
@@ -953,27 +973,59 @@ class GooglePlacesService:
         return " • ".join(notes) if notes else None
 
     def generate_description(self, place: dict[str, Any]) -> str:
-        """Generate a description for a restaurant."""
+        """Generate a bounded description from existing Google place details (no extra API calls).
+
+        Uses: normalized cuisine (from extract_restaurant_data), formatted primaryType,
+        derived service_level when confident, priceLevel when present, rating when available.
+        Output is deterministic and kept within 500 chars for form compatibility.
+        """
         if not place:
             return ""
 
-        parts = []
+        parts: list[str] = []
+        max_len = 500
 
-        # Add cuisine type
+        # Cuisine or type label: prefer normalized cuisine, else formatted primary type
         cuisine = place.get("cuisine_type", "")
-        if cuisine and cuisine != "american":
-            parts.append(f"{cuisine.title()} restaurant")
+        if not cuisine:
+            # Raw place often has no cuisine_type; use same extraction as elsewhere (no extra API call)
+            extracted = self.extract_restaurant_data(place)
+            cuisine = extracted.get("cuisine_type", "")
+        primary_type_raw = place.get("primaryType") or place.get("primary_type")
+        primary_type = str(primary_type_raw) if primary_type_raw else ""
+        cuisine_lower = str(cuisine).lower() if cuisine else ""
+        if cuisine_lower and cuisine_lower not in ("american", "unknown"):
+            type_label = f"{str(cuisine).title()} restaurant"
         else:
-            parts.append("Restaurant")
+            type_label = (
+                self.format_primary_type_for_display(primary_type) or "Restaurant" if primary_type else "Restaurant"
+            )
+        if type_label:
+            parts.append(type_label)
 
-        # ENTERPRISE TIER: Add rating if available
+        # Service level: only when detection is confident (no extra API)
+        service_level, confidence = self.detect_service_level_from_data(place)
+        if confidence > 0.3 and service_level and service_level != "unknown":
+            human = service_level.replace("_", " ").title()
+            parts.append(human)
+
+        # PRO TIER: Price level as $ symbols when present
+        price_raw = place.get("priceLevel") or place.get("price_level")
+        price_int = self._convert_price_level(price_raw)
+        if price_int is not None and price_int >= 1:
+            parts.append("$" * min(price_int, 4))
+
+        # ENTERPRISE TIER: Rating when available
         rating = place.get("rating")
-        if rating:
-            parts.append(f"rated {rating:.1f} stars")
+        if rating is not None:
+            try:
+                r = float(rating)
+                parts.append(f"rated {r:.1f} stars")
+            except (TypeError, ValueError):
+                pass
 
-        # PRO TIER: Price level removed from description (may be deprecated in new API)
-
-        return " • ".join(parts) if parts else "Restaurant"
+        result = " • ".join(parts) if parts else "Restaurant"
+        return result[:max_len] if result else "Restaurant"
 
     def detect_service_level_from_data(self, place_data: dict[str, Any]) -> tuple[str, float]:
         """Detect service level from Google Places data.
@@ -1001,7 +1053,7 @@ class GooglePlacesService:
         # PRO TIER: primaryType and types increase confidence
         confidence = 0.5  # Base confidence
 
-        primary_type = place_data.get("primaryType")
+        primary_type = place_data.get("primaryType") or place_data.get("primary_type")
         types = place_data.get("types", [])
 
         if primary_type:
@@ -1013,6 +1065,12 @@ class GooglePlacesService:
         rating = place_data.get("rating")
         if rating is not None:
             confidence += 0.1
+
+        # Lower confidence when only signal is generic "restaurant" with no price/name/merchant
+        has_price = place_data.get("price_level") is not None or place_data.get("priceLevel") is not None
+        has_merchant_hint = bool(place_data.get("merchant_category") or place_data.get("merchant_category_hint"))
+        if service_level_str == "casual_dining" and not has_price and not has_merchant_hint:
+            confidence = min(confidence, 0.4)
 
         # Cap confidence at 1.0
         confidence = min(confidence, 1.0)

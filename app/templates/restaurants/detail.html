@@ -7,6 +7,7 @@ Restaurant Details - Meal Expense Tracker
 {% endblock title %}
 {% block extra_css %}
 <link rel="stylesheet" href="{{ url_for('static', filename='css/pages/restaurant-detail.css') }}">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/intl-tel-input@25.3.0/build/css/intlTelInput.css" />
 {% endblock extra_css %}
 {% block breadcrumb %}
 {% endblock breadcrumb %}
@@ -29,7 +30,16 @@ Restaurant Details - Meal Expense Tracker
                         <h1 class="h3 mb-2 d-flex align-items-center" id="restaurant-name">
                             <!-- Restaurant Icon -->
                             <div class="restaurant-icon me-3 flex-shrink-0">
-                                {% if restaurant.website %}
+                                {% if restaurant.merchant and restaurant.merchant.favicon_url %}
+                                {# Merchant favicon override (e.g. brand icon) #}
+                                <img src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"
+                                    data-favicon-url="{{ restaurant.merchant.favicon_url }}" data-size="32"
+                                    alt="{{ restaurant.display_name or restaurant.name }} icon" class="restaurant-favicon" width="32" height="32"
+                                    style="opacity: 0; transition: opacity 0.2s;" />
+                                <i class="fas fa-utensils text-primary restaurant-fallback-icon restaurant-fallback-icon-large"
+                                    style="display: none; font-size: 32px;"></i>
+                                {% elif restaurant.website %}
+                                {# Favicon: restaurant view uses restaurant website #}
                                 <img src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"
                                     data-website="{{ restaurant.website }}" data-size="32"
                                     alt="{{ restaurant.display_name or restaurant.name }} icon" class="restaurant-favicon" width="32" height="32"
@@ -128,6 +138,15 @@ Restaurant Details - Meal Expense Tracker
                                 </div>
                                 <div class="card-body">
                                     <div class="list-group list-group-flush">
+                                        <div class="list-group-item px-0 py-2 border-0">
+                                            <div class="d-flex align-items-center">
+                                                <i class="fas fa-signature text-muted me-3"></i>
+                                                <div>
+                                                    <span class="text-muted small">Restaurant Name</span>
+                                                    <div>{{ restaurant.name }}</div>
+                                                </div>
+                                            </div>
+                                        </div>
                                         {% if restaurant.type %}
                                         <div class="list-group-item px-0 py-2 border-0">
                                             <div class="d-flex align-items-center">
@@ -168,14 +187,24 @@ Restaurant Details - Meal Expense Tracker
                                             </div>
                                         </div>
                                         {% endif %}
-                                        {% if restaurant.is_chain is not none %}
+                                        {% if restaurant.merchant %}
                                         <div class="list-group-item px-0 py-2 border-0">
                                             <div class="d-flex align-items-center">
                                                 <i class="fas fa-building text-muted me-3"></i>
                                                 <div>
-                                                    <span class="text-muted small">Restaurant Type</span>
-                                                    <div>{{ 'Chain Restaurant' if restaurant.is_chain else 'Independent
-                                                        Restaurant' }}</div>
+                                                    <span class="text-muted small">Merchant</span>
+                                                    <div class="fw-semibold">{{ restaurant.merchant.name }}</div>
+                                                    {% if restaurant.merchant.short_name %}
+                                                    <div class="small text-muted">Alias: {{ restaurant.merchant.short_name }}</div>
+                                                    {% endif %}
+                                                    <div class="small text-muted">
+                                                        {{ 'Chain Brand' if restaurant.merchant.is_chain else 'Independent Brand' }}
+                                                    </div>
+                                                    <a
+                                                        href="{{ url_for('merchants.view_merchant', merchant_id=restaurant.merchant.id) }}"
+                                                        class="small text-decoration-none">
+                                                        <i class="fas fa-external-link-alt me-1"></i>View Merchant Details
+                                                    </a>
                                                 </div>
                                             </div>
                                         </div>
@@ -505,7 +534,6 @@ Restaurant Details - Meal Expense Tracker
                             </div>
                             <div class="mb-3">{{ render_field(form.cuisine) }}</div>
                             <div class="mb-3">{{ render_field(form.rating) }}</div>
-                            <div class="mb-3">{{ render_field(form.is_chain) }}</div>
                             <div class="mb-3">{{ render_field(form.description) }}</div>
                         </div>
                         <div class="mb-4">
@@ -590,7 +618,7 @@ Restaurant Details - Meal Expense Tracker
         <!-- Right Column - Expense Summary moved to sidebar above -->
 </div>
 <!-- Full-width Expense History Section -->
-<div class="expense-history" id="expense-history">
+<div class="expense-history" id="expense-history" data-restaurant-id="{{ restaurant.id }}">
     <div class="card shadow-sm">
         <div class="card-header bg-white py-2">
             <div class="d-flex justify-content-between align-items-center">
@@ -833,6 +861,7 @@ Restaurant Details - Meal Expense Tracker
                 <form action="{{ url_for('expenses.delete_expense', expense_id=expense.id) }}" method="post"
                     class="d-inline">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <input type="hidden" name="next" value="{{ url_for('restaurants.restaurant_details', restaurant_id=restaurant.id) }}">
                     <button type="submit" class="btn btn-danger">
                         <i class="fas fa-trash-alt me-1"></i>Delete Expense
                     </button>
@@ -939,6 +968,7 @@ Restaurant Details - Meal Expense Tracker
 {% endblock content %}
 {% block scripts %}
 {{ super() }}
+<script src="https://cdn.jsdelivr.net/npm/intl-tel-input@25.3.0/build/js/intlTelInput.min.js"></script>
 <!-- Cuisine badge component for restaurant displays -->
 <!-- Restaurant detail functionality -->
 <script type="module" src="{{ url_for('static', filename='js/pages/restaurant-detail.js') }}"></script>

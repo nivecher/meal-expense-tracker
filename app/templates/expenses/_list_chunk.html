@@ -1,0 +1,21 @@
+{# Fragment appended by HTMX for infinite scroll: card columns + table rows + optional sentinel #}
+<div class="expense-chunk-buffer" data-next-offset="{{ next_offset }}">
+    <div class="expense-chunk-cards">
+        {% for expense in expenses %} {% include "expenses/_expense_card.html" %} {% endfor %}
+    </div>
+    <template class="expense-chunk-table-rows">
+        {% for expense in expenses %} {% include "expenses/_expense_table_row.html" %} {% endfor %}
+    </template>
+    {% if has_more %}
+    <div
+        class="expense-load-more-sentinel"
+        data-expense-sentinel="true"
+        hx-get="{{ url_for('expenses.list_expenses', offset=next_offset, q=search, meal_type=meal_type, order_type=order_type, category=category, start_date=start_date, end_date=end_date, tags=tags) }}"
+        hx-trigger="revealed"
+        hx-swap="beforeend"
+        hx-target="#expense-list-chunk-target"
+        hx-include="#expense-search-form, #expense-filter-form">
+        <span class="visually-hidden">Load more expenses</span>
+    </div>
+    {% endif %}
+</div>

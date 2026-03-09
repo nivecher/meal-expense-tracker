@@ -137,6 +137,18 @@
         margin-left: 0.5rem;
         color: #6c757d;
     }
+
+    .taxonomy-group {
+        border: 1px solid #e9ecef;
+        border-radius: 0.75rem;
+        padding: 1rem;
+        margin-bottom: 1rem;
+        background: #fff;
+    }
+
+    .taxonomy-item + .taxonomy-item {
+        margin-top: 0.75rem;
+    }
 </style>
 {% endblock head_extra %} {% block content %}
 <div class="container">
@@ -259,6 +271,10 @@
                                             ><i class="fas fa-check text-success me-2"></i>Review spending patterns
                                             monthly</li
                                         >
+                                        <li class="mb-2"
+                                            ><i class="fas fa-check text-success me-2"></i>For bank-style imports, keep
+                                            payees aligned with restaurant display names when practical</li
+                                        >
                                     </ul>
                                 </div>
                             </div>
@@ -335,7 +351,8 @@
                                             ><strong>Expenses:</strong> Card or table view grouped by month. Table shows
                                             Date/Tags, Restaurant (with cuisine and service level), Meal, Order, Party
                                             Size, $/person, and Amount with a compact layout. Select rows via
-                                            checkboxes; header checkbox shows a dash when some rows are selected.</li
+                                            checkboxes; header checkbox shows a dash when some rows are selected. More
+                                            rows load automatically as you scroll (infinite scroll).</li
                                         >
                                         <li class="mb-2"
                                             ><strong>Calendar:</strong> Monthly grid showing expenses by date. Use
@@ -361,6 +378,13 @@
                                         fields like <code>datetime_utc</code>, <code>order_type</code>, and
                                         <code>party_size</code>. For best results, import in batches (up to 2,000 rows
                                         per upload) to avoid request timeouts.
+                                    </div>
+                                    <div class="alert alert-warning">
+                                        <strong>Planned Simplifi Review:</strong> The maintained design direction is a
+                                        guided import review step for Quicken Simplifi exports. Planned duplicate
+                                        candidates will use exact absolute amount, a one-to-three-day date window, and
+                                        payee matching against restaurant names or display names. Rows are intended to
+                                        support explicit actions to match, create, or skip.
                                     </div>
 
                                     <h6><i class="fas fa-keyboard me-2"></i>Keyboard Shortcuts</h6>
@@ -457,7 +481,9 @@
                                             structured address components (street, city, state, postal code) for
                                             accuracy. Cuisine and service level are inferred from the place name and
                                             type when you add a restaurant from Google Places; you can edit them in the
-                                            form.
+                                            form. A short <strong>description</strong> (e.g. cuisine, type, service
+                                            level, price, rating) is filled from the same Google data when you add or
+                                            quick-add a restaurant; you can edit or clear it.
                                         </p>
                                     </div>
 
@@ -475,7 +501,38 @@
                                         <li class="mb-2"
                                             ><strong>Track:</strong> See visit history and spending totals</li
                                         >
+                                        <li class="mb-2"
+                                            ><strong>Merchants:</strong> Link locations to a brand record so service
+                                            level, cuisine, menu focus, and format category stay consistent across
+                                            reporting.</li
+                                        >
+                                        <li class="mb-2"
+                                            ><strong>Icons:</strong> Restaurant and merchant list/detail pages show a
+                                            site icon when a website is set (or a merchant Favicon URL override); if
+                                            none is available, a fallback icon is shown.</li
+                                        >
+                                        <li class="mb-2"
+                                            ><strong>List:</strong> The restaurant list (List tab) uses infinite scroll:
+                                            more rows load as you scroll. Search and filters apply to the full set.</li
+                                        >
                                     </ul>
+
+                                    <h6><i class="fas fa-building me-2"></i>Merchant Format Categories</h6>
+                                    <p class="small text-muted">
+                                        Format Category describes the merchant's physical or operating footprint. It is
+                                        separate from <strong>Service Level</strong> and <strong>Menu Focus</strong>.
+                                    </p>
+                                    {% for group in merchant_format_category_groups %}
+                                    <div class="taxonomy-group">
+                                        <div class="fw-semibold mb-2">{{ group.label }}</div>
+                                        {% for option in group.options %}
+                                        <div class="taxonomy-item small">
+                                            <div><strong>{{ option.label }}</strong></div>
+                                            <div class="text-muted">{{ option.definition }}</div>
+                                        </div>
+                                        {% endfor %}
+                                    </div>
+                                    {% endfor %}
 
                                     <h6><i class="fas fa-map-marked-alt me-2"></i>Places Tab Map View</h6>
                                     <p class="small mb-2">

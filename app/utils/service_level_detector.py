@@ -393,6 +393,100 @@ def detect_restaurant_service_level(google_places_data: dict[str, Any]) -> tuple
     return service_level, confidence
 
 
+# Name substrings/keywords for tiebreaker when types are generic "restaurant" only.
+# Used only inside detect_service_level_from_google_places, not for public name-only API.
+_QUICK_SERVICE_NAME_SUBSTRINGS = [
+    "mcdonald's",
+    "mcdonalds",
+    "chick-fil-a",
+    "chick fil a",
+    "taco bell",
+    "wendy's",
+    "wendys",
+    "burger king",
+    "subway",
+    "dunkin'",
+    "dunkin",
+    "kfc",
+    "pizza hut",
+    "domino's",
+    "dominos",
+    "sonic",
+    "arbys",
+    "arby's",
+    "popeyes",
+    "panda express",
+    "chipotle",  # can be fast_casual; name hint competes with price
+]
+_QUICK_SERVICE_KEYWORDS = ["drive-thru", "drive thru", "drive-in", "drive in", "fast food"]
+_FAST_CASUAL_NAME_SUBSTRINGS = [
+    "chipotle",
+    "panera",
+    "panera bread",
+    "five guys",
+    "moes",
+    "moe's",
+    "qdoba",
+    "zoeys",
+    "zoës",
+]
+_FAST_CASUAL_KEYWORDS = ["fast casual"]
+_CASUAL_DINING_KEYWORDS = ["bistro", "tavern", "grill & bar", "grill and bar", "brewery", "gastropub"]
+
+
+def _normalize_price_level(place_data: dict) -> int | None:
+    """Normalize price level from place_data to int 0-4. Uses existing data only (no API call).
+
+    Accepts place_data.get('price_level') (int) or place_data.get('priceLevel') (Google enum string).
+    """
+    if not place_data:
+        return None
+    raw = place_data.get("price_level")
+    if raw is None:
+        raw = place_data.get("priceLevel")
+    if raw is None:
+        return None
+    if isinstance(raw, int):
+        return max(0, min(4, raw))
+    if isinstance(raw, str):
+        price_map = {
+            "price_level_free": 0,
+            "price_level_inexpensive": 1,
+            "price_level_moderate": 2,
+            "price_level_expensive": 3,
+            "price_level_very_expensive": 4,
+        }
+        key = raw.lower().replace("-", "_").strip()
+        return price_map.get(key)
+    return None
+
+
+def _name_hint_for_service_level(name: str) -> ServiceLevel | None:
+    """Return a service level hint from restaurant name, or None. Used as tiebreaker only."""
+    if not name or not isinstance(name, str):
+        return None
+    name_lower = name.lower()
+    for sub in _QUICK_SERVICE_NAME_SUBSTRINGS:
+        if sub in name_lower:
+            # Chipotle is also in fast_casual; prefer fast_casual for Chipotle by checking first
+            if sub == "chipotle":
+                continue
+            return ServiceLevel.QUICK_SERVICE
+    for kw in _QUICK_SERVICE_KEYWORDS:
+        if kw in name_lower:
+            return ServiceLevel.QUICK_SERVICE
+    for sub in _FAST_CASUAL_NAME_SUBSTRINGS:
+        if sub in name_lower:
+            return ServiceLevel.FAST_CASUAL
+    for kw in _FAST_CASUAL_KEYWORDS:
+        if kw in name_lower:
+            return ServiceLevel.FAST_CASUAL
+    for kw in _CASUAL_DINING_KEYWORDS:
+        if kw in name_lower:
+            return ServiceLevel.CASUAL_DINING
+    return None
+
+
 def detect_service_level_from_name(restaurant_name: str) -> ServiceLevel:
     """
     Detect service level from restaurant name using Google Places API data.
@@ -442,6 +536,21 @@ def detect_service_level_from_google_places(place_data: dict) -> ServiceLevel:
     if not types:
         return ServiceLevel.UNKNOWN
 
+    # Merchant category overrides all type-based and price-based logic when present
+    merchant_category = place_data.get("merchant_category") or place_data.get("merchant_category_hint")
+    if merchant_category:
+        _category_to_level = {
+            "fast_food": ServiceLevel.QUICK_SERVICE,
+            "quick_service": ServiceLevel.QUICK_SERVICE,
+            "fast_casual": ServiceLevel.FAST_CASUAL,
+            "casual_dining": ServiceLevel.CASUAL_DINING,
+            "fine_dining": ServiceLevel.FINE_DINING,
+            "coffee_shop": ServiceLevel.FAST_CASUAL,
+        }
+        level = _category_to_level.get((merchant_category or "").strip().lower().replace(" ", "_"))
+        if level is not None:
+            return level
+
     types_lower = [t.lower() for t in types]
     # When primaryType is missing, use first type as effective primary (API may omit primary)
     effective_primary = primary_type_lower or (types_lower[0] if types_lower else "")
@@ -458,11 +567,14 @@ def detect_service_level_from_google_places(place_data: dict) -> ServiceLevel:
         "convenience_store",
         "grocery_store",
         "supermarket",
+        "dessert_restaurant",
         "dessert_shop",
+        "confectionery",
+        "bakery",
+        "food_store",
         "ice_cream_shop",
         "coffee_shop",
         "sandwich_shop",
-        "bakery",
     ]
     if effective_primary and effective_primary in quick_service_primary:
         return ServiceLevel.QUICK_SERVICE
@@ -474,6 +586,8 @@ def detect_service_level_from_google_places(place_data: dict) -> ServiceLevel:
         "salad_shop",
         "burrito_restaurant",
         "deli",
+        "barbecue_restaurant",
+        "barbeque_restaurant",
     ]
     if effective_primary and effective_primary in fast_casual_primary:
         return ServiceLevel.FAST_CASUAL
@@ -486,12 +600,54 @@ def detect_service_level_from_google_places(place_data: dict) -> ServiceLevel:
     if effective_primary and effective_primary in fine_dining_primary:
         return ServiceLevel.FINE_DINING
 
-    # Casual Dining - restaurant as primary or any type (e.g. italian_restaurant, mexican_restaurant)
-    if effective_primary == "restaurant":
-        return ServiceLevel.CASUAL_DINING
-    if "restaurant" in types_lower:
-        return ServiceLevel.CASUAL_DINING
-    if any("restaurant" in t for t in types_lower):
+    # Ambiguous: restaurant as primary or any type (e.g. italian_restaurant, mexican_restaurant).
+    # Use price level (existing/caller-provided only, no Google fetch) and name tiebreaker.
+    if effective_primary == "restaurant" or "restaurant" in types_lower or any("restaurant" in t for t in types_lower):
+        price = _normalize_price_level(place_data)
+        name_raw = place_data.get("displayName") or place_data.get("name")
+        if isinstance(name_raw, dict):
+            name_str = name_raw.get("text", "") or ""
+        else:
+            name_str = name_raw or ""
+        name_hint = _name_hint_for_service_level(name_str)
+
+        # Type hints that suggest full-service casual even at price 2
+        casual_dining_type_hints = [
+            "family_restaurant",
+            "diner",
+            "bar_and_grill",
+            "tavern",
+            "brewery",
+            "gastropub",
+            "pub",
+        ]
+        has_casual_type_hint = any(hint in types_lower for hint in casual_dining_type_hints)
+
+        if price is not None:
+            if price == 4:
+                return ServiceLevel.FINE_DINING
+            if price == 3:
+                return ServiceLevel.CASUAL_DINING
+            if price == 2:
+                if has_casual_type_hint:
+                    return ServiceLevel.CASUAL_DINING
+                if name_hint == ServiceLevel.FAST_CASUAL:
+                    return ServiceLevel.FAST_CASUAL
+                return ServiceLevel.CASUAL_DINING
+            if price == 1:
+                if name_hint == ServiceLevel.CASUAL_DINING:
+                    return ServiceLevel.CASUAL_DINING
+                if name_hint == ServiceLevel.QUICK_SERVICE:
+                    return ServiceLevel.QUICK_SERVICE
+                return ServiceLevel.FAST_CASUAL
+            if price == 0:
+                if name_hint == ServiceLevel.CASUAL_DINING:
+                    return ServiceLevel.CASUAL_DINING
+                return ServiceLevel.QUICK_SERVICE
+
+        if name_hint is not None:
+            return name_hint
+
         return ServiceLevel.CASUAL_DINING
 
     return ServiceLevel.UNKNOWN

@@ -8,7 +8,7 @@
 
 import { toast } from './utils/notifications.js';
 import { EventHandlers } from './components/event-handlers.js';
-import { clearFaviconCache, initializeRobustFaviconHandling } from './utils/robust-favicon-handler.js';
+import { clearFaviconCache, initializeFaviconSystem } from './utils/robust-favicon-handler.js';
 
 function runWhenIdle(callback, timeoutMs = 1200) {
   if (typeof callback !== 'function') return;
@@ -347,10 +347,7 @@ async function init() {
 
     // Defer non-critical UI polish work so DOMContentLoaded isn't blocked
     runWhenIdle(() => initUI(), 800);
-    runWhenIdle(() => {
-      initializeRobustFaviconHandling('.restaurant-favicon');
-      initializeRobustFaviconHandling('.restaurant-favicon-table');
-    }, 1500);
+    runWhenIdle(() => initializeFaviconSystem(), 1500);
     runWhenIdle(() => initTagColorWatcher(), 1500);
 
     registerTagRefreshEvents();

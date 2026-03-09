@@ -30,10 +30,10 @@
                            data-datetime-tooltip="full"
                            title="{{ expense.date.isoformat() }}">{{ expense.date|format_date_user_tz("%b %d %Y") }}</a>
                     </div>
-                    {% if expense.notes or expense.tags or expense.receipt_image %}
+                    {% if expense.notes or expense.tags or expense.receipt_storage_path %}
                         <div class="tags-notes-compact d-flex align-items-center">
-                            {% if expense.receipt_image %}
-                                <a href="{{ get_receipt_url(expense.receipt_image) }}"
+                            {% if expense.receipt_storage_path %}
+                                <a href="{{ get_receipt_url(expense.receipt_storage_path) }}"
                                    target="_blank"
                                    class="table-receipt-compact me-2 text-decoration-none"
                                    data-bs-toggle="tooltip"

@@ -1,0 +1,17 @@
+{# Fragment appended by HTMX for infinite scroll: card columns + optional sentinel #}
+<div class="restaurant-chunk-buffer" data-next-offset="{{ next_offset }}">
+    <div class="restaurant-chunk-cards">
+        {% for restaurant in restaurants %} {% include "restaurants/_restaurant_list_card.html" %} {% endfor %}
+    </div>
+    {% if has_more %}
+    <div
+        class="restaurant-load-more-sentinel"
+        data-restaurant-sentinel="true"
+        hx-get="{{ url_for('restaurants.list_restaurants', tab='restaurants', offset=next_offset, q=search, cuisine=cuisine, service_level=service_level, city=city, is_chain=is_chain, merchant_status=merchant_status, missing_location_name=missing_location_name, rating_min=rating_min, rating_max=rating_max) }}"
+        hx-trigger="revealed"
+        hx-swap="beforeend"
+        hx-target="#restaurant-list-chunk-target">
+        <span class="visually-hidden">Load more restaurants</span>
+    </div>
+    {% endif %}
+</div>

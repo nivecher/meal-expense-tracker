@@ -175,7 +175,7 @@ class TestAuthRoutes:
             assert user.last_name == "Doe"
             assert user.display_name == "Johnny"
             assert user.bio == "Test bio"
-            assert user.phone == "123-456-7890"
+            assert user.phone == "+11234567890"
             assert user.timezone == "America/New_York"  # Normalized from US/Eastern
             assert user.avatar_url == "https://example.com/avatar.jpg"
 

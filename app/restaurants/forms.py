@@ -2,7 +2,6 @@ from typing import Any
 
 from flask_wtf import FlaskForm
 from wtforms import (
-    BooleanField,
     FileField,
     FloatField,
     SelectField,
@@ -21,6 +20,10 @@ from wtforms.validators import (
 
 from app.constants.cuisines import get_cuisine_names
 from app.constants.restaurant_types import get_restaurant_type_form_choices
+from app.constants.states import get_state_form_choices
+from app.extensions import db
+from app.merchants.models import Merchant
+from app.utils.phone_utils import normalize_phone_for_storage
 
 
 def validate_service_level(form: Any, field: Any) -> None:
@@ -40,7 +43,7 @@ def validate_service_level(form: Any, field: Any) -> None:
 class RestaurantForm(FlaskForm):
     # Basic Information
     name = StringField("Restaurant Name", validators=[DataRequired(), Length(max=100)])
-    location_name = StringField("Location Name", validators=[Optional(), Length(max=100)])
+    location_name = StringField("Location Name", validators=[Length(max=100)])
     type = SelectField(
         "Type",
         choices=get_restaurant_type_form_choices(),
@@ -53,10 +56,14 @@ class RestaurantForm(FlaskForm):
     address_line_1 = StringField("Address Line 1", validators=[Optional(), Length(max=255)])
     address_line_2 = StringField("Address Line 2", validators=[Optional(), Length(max=255)])
     city = StringField("City", validators=[Optional(), Length(max=100)])
-    state = StringField("State/Province", validators=[Optional(), Length(max=100)])
+    state = SelectField(
+        "State/Province",
+        choices=get_state_form_choices(),
+        validators=[Optional()],
+    )
     postal_code = StringField("Postal Code", validators=[Optional(), Length(max=20)])
     country = StringField("Country", validators=[Optional(), Length(max=100)])
-    phone = StringField("Phone", validators=[Optional(), Length(max=20)])
+    phone = StringField("Phone", filters=[normalize_phone_for_storage], validators=[Optional(), Length(max=20)])
     email = StringField("Email", validators=[Optional(), Length(max=120)])
     website = StringField("Website", validators=[Optional(), URL(), Length(max=255)])
 
@@ -122,7 +129,6 @@ class RestaurantForm(FlaskForm):
             "title": "Price level will be auto-detected from Google Places data if available",
         },
     )
-    is_chain = BooleanField("Part of a chain", false_values=(False, "false", 0, "0"), default=False)
     merchant_id = SelectField(
         "Merchant",
         choices=[],
@@ -133,6 +139,16 @@ class RestaurantForm(FlaskForm):
 
     # Form submission
     submit = SubmitField("Save Restaurant")
+
+    def validate_location_name(self, field: Any) -> None:
+        """Require location names for linked chain merchants."""
+        merchant_id = getattr(self.merchant_id, "data", None)
+        if not merchant_id or (field.data or "").strip():
+            return
+
+        merchant = db.session.get(Merchant, merchant_id)
+        if merchant and merchant.is_chain:
+            raise ValidationError("Location Name is required when the linked merchant is a chain brand.")
 
 
 class RestaurantSearchForm(FlaskForm):

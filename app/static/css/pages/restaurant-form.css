@@ -182,6 +182,120 @@
   color: #000;
 }
 
+.merchant-association-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.merchant-association-summary,
+.merchant-association-empty,
+.merchant-suggestion-panel {
+  border: 1px solid #dbe7f3;
+  border-radius: 0.75rem;
+  background: linear-gradient(180deg, #fff 0%, #f8fbff 100%);
+  padding: 0.9rem 1rem;
+}
+
+.merchant-summary-card,
+.merchant-suggestion-panel {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.merchant-summary-label {
+  font-size: 0.74rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #64748b;
+  font-weight: 700;
+}
+
+.merchant-summary-name {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #1e293b;
+}
+
+.merchant-summary-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  color: #64748b;
+  font-size: 0.85rem;
+  margin-top: 0.2rem;
+}
+
+.merchant-summary-actions,
+.merchant-empty-actions,
+.merchant-search-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.merchant-association-empty {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.merchant-search-panel {
+  padding: 0.75rem;
+  border: 1px dashed #cbd5e1;
+  border-radius: 0.75rem;
+  background: #fff;
+}
+
+.merchant-suggestion-panel {
+  border-color: #b7ebc6;
+  background: linear-gradient(180deg, #f6fff8 0%, #effcf3 100%);
+}
+
+.restaurant-search-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.3rem 0.65rem;
+  border: 1px solid #dbe7f3;
+  border-radius: 999px;
+  background: linear-gradient(180deg, #fff 0%, #f8fbff 100%);
+  box-shadow: 0 1px 2px rgb(15 23 42 / 4%);
+}
+
+.restaurant-search-toggle .form-check-input {
+  width: 0.9rem;
+  height: 0.9rem;
+  margin: 0;
+  float: none;
+  border-color: #94a3b8;
+}
+
+.restaurant-search-toggle .form-check-input:checked {
+  background-color: #0ea5e9;
+  border-color: #0ea5e9;
+}
+
+.restaurant-search-toggle .form-check-label {
+  margin: 0;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #334155;
+  cursor: pointer;
+  line-height: 1;
+}
+
+@media (width <= 768px) {
+  .merchant-summary-card,
+  .merchant-association-empty,
+  .merchant-suggestion-panel {
+    flex-direction: column;
+  }
+}
+
 /* Input group button styling */
 
 .input-group .btn {
