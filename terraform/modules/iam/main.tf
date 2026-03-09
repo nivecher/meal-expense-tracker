@@ -104,6 +104,17 @@ resource "aws_iam_policy" "lambda_combined" {
           "textract:GetDocumentAnalysis"
         ]
         Resource = "*"
+      },
+      # ECR access for container images
+      {
+        Effect = "Allow"
+        Action = [
+          "ecr:GetAuthorizationToken",
+          "ecr:BatchCheckLayerAvailability",
+          "ecr:GetDownloadUrlForLayer",
+          "ecr:BatchGetImage"
+        ]
+        Resource = "arn:aws:ecr:${var.region}:${var.account_id}:repository/${var.app_name}-${var.environment}-lambda"
       }
     ]
   })
