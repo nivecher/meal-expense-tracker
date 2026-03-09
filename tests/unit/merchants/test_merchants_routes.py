@@ -124,6 +124,37 @@ def test_new_merchant_form_shows_chain_toggle(client, auth, test_user) -> None:
     assert b"Chain Brand" in response.data
 
 
+def test_new_merchant_form_drops_unsafe_redirect_to(client, auth, test_user) -> None:
+    """Merchant form should not preserve an external redirect target."""
+    _enable_advanced_features(test_user)
+    auth.login("testuser_1", "testpass")
+
+    response = client.get(url_for("merchants.new_merchant", redirect_to="https://evil.example/return"))
+
+    assert response.status_code == 200
+    assert b"https://evil.example/return" not in response.data
+
+
+def test_new_merchant_ignores_unsafe_redirect_to_on_submit(client, auth, test_user) -> None:
+    """Merchant creation should ignore an external redirect target."""
+    _enable_advanced_features(test_user)
+    auth.login("testuser_1", "testpass")
+
+    response = client.post(
+        url_for("merchants.new_merchant"),
+        data={
+            "name": "Safe Merchant",
+            "short_name": "Safe Merchant",
+            "category": "cafe_bakery",
+            "redirect_to": "https://evil.example/return",
+        },
+    )
+
+    assert response.status_code == 302
+    assert response.headers["Location"].endswith("/merchants/")
+    assert "evil.example" not in response.headers["Location"]
+
+
 def test_edit_merchant_chain_suggestion_uses_current_user_restaurant_count(client, auth, test_user, test_user2) -> None:
     """Chain suggestion should count only the current user's linked restaurants."""
     _enable_advanced_features(test_user)

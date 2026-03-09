@@ -4,7 +4,7 @@ import csv
 import io
 import json
 from typing import Any
-from urllib.parse import urlencode
+from urllib.parse import urlencode, urlparse
 
 from flask import Response, abort, flash, jsonify, make_response, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
@@ -58,6 +58,27 @@ def _build_new_merchant_redirect_url(redirect_to: str, merchant_id: int) -> str:
     """Append merchant_id to a redirect target without breaking existing query params."""
     separator = "&" if "?" in redirect_to else "?"
     return f"{redirect_to}{separator}{urlencode({'merchant_id': merchant_id})}"
+
+
+def _is_safe_redirect_path(url: str | None) -> bool:
+    """Return True if url is a safe internal path for redirect."""
+    if not url or not isinstance(url, str):
+        return False
+    candidate = url.strip()
+    if candidate.startswith(("http://", "https://", "//")):
+        return False
+    if not candidate.startswith("/"):
+        return False
+
+    parsed = urlparse(candidate)
+    return bool(parsed.path and not parsed.netloc)
+
+
+def _get_safe_redirect_path(url: str | None) -> str | None:
+    """Return a sanitized internal redirect path or None."""
+    if not _is_safe_redirect_path(url):
+        return None
+    return str(url).strip()
 
 
 def _get_merchant_cuisine_choices() -> list[str]:
@@ -156,7 +177,7 @@ def new_merchant() -> Any:
         service_level = request.form.get("service_level", "").strip() or None
         is_chain = request.form.get("is_chain") == "on"
         rewards_program_id_raw = request.form.get("rewards_program_id", "").strip()
-        redirect_to = request.form.get("redirect_to", "")
+        redirect_to = _get_safe_redirect_path(request.form.get("redirect_to")) or ""
         form_prefill = {
             "name": name,
             "short_name": short_name or "",
@@ -230,7 +251,7 @@ def new_merchant() -> Any:
 
         return redirect(url_for("merchants.list_merchants"))
 
-    redirect_to = request.args.get("redirect_to", "")
+    redirect_to = _get_safe_redirect_path(request.args.get("redirect_to")) or ""
     prefill = _build_new_merchant_prefill_from_request()
 
     restaurant_id = request.args.get("restaurant_id", "").strip()

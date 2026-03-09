@@ -287,6 +287,43 @@ def test_delete_expense(client, auth, test_user) -> None:
     assert FlashMessages.EXPENSE_DELETED.encode() in response.data or b"Dashboard" in response.data
 
 
+def test_delete_expense_ignores_unsafe_next_url(client, auth, test_user) -> None:
+    """Delete expense should not redirect to an external next URL."""
+    auth.login("testuser_1", "testpass")
+    client.post(
+        "/restaurants/add",
+        data={
+            "name": "Test Restaurant",
+            "type": "restaurant",
+            "city": "Test City",
+            "state": "CA",
+            "zip_code": "12345",
+            "address": "123 Test St",
+            "phone": "123-456-7890",
+            "website": "http://test.com",
+            "cuisine": "American",
+        },
+        follow_redirects=True,
+    )
+    client.post(
+        "/expenses/add",
+        data={
+            "restaurant_id": 1,
+            "date": "2024-02-20",
+            "meal_type": "lunch",
+            "amount": "25.50",
+            "notes": "Test expense",
+        },
+        follow_redirects=True,
+    )
+
+    response = client.post("/expenses/1/delete", data={"next": "https://evil.example/steal"})
+
+    assert response.status_code == 302
+    assert response.headers["Location"].endswith("/expenses/")
+    assert "evil.example" not in response.headers["Location"]
+
+
 def test_expense_filters(client, auth, test_user) -> None:
     """Test expense filtering."""
     auth.login("testuser_1", "testpass")

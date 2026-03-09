@@ -10,6 +10,7 @@ import tempfile
 
 # Type annotations for responses
 from typing import Any, Optional, Tuple, Union, cast
+from urllib.parse import urlparse
 import uuid
 
 from flask import (
@@ -920,10 +921,15 @@ def _is_safe_redirect_path(url: str | None) -> bool:
         return False
     if not url.startswith("/"):
         return False
-    from urllib.parse import urlparse
-
     parsed = urlparse(url)
     return bool(parsed.path and not parsed.netloc)
+
+
+def _get_safe_redirect_path(url: str | None) -> str | None:
+    """Return a sanitized internal redirect path or None."""
+    if not _is_safe_redirect_path(url):
+        return None
+    return str(url).strip()
 
 
 @bp.route("/<int:expense_id>/delete", methods=["POST"])
@@ -952,9 +958,9 @@ def delete_expense(expense_id: int) -> Response:
     if expense.user_id != current_user.id:
         abort(403)
     expense_services.delete_expense(expense)
-    next_url = request.form.get("next")
-    if next_url and _is_safe_redirect_path(next_url):
-        return redirect(next_url)  # type: ignore[return-value]
+    safe_next_url = _get_safe_redirect_path(request.form.get("next"))
+    if safe_next_url:
+        return redirect(safe_next_url)  # type: ignore[return-value]
     return redirect(url_for("expenses.list_expenses"))  # type: ignore[return-value]
 
 

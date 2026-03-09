@@ -5,6 +5,22 @@
 
 import { attachIntlPhoneFormatting } from '../utils/contact-fields.js';
 
+function isSafeInternalUrl(url) {
+  if (!url) return false;
+
+  try {
+    const parsed = new URL(url, window.location.origin);
+    return parsed.origin === window.location.origin && parsed.pathname.startsWith('/');
+  } catch {
+    return false;
+  }
+}
+
+function navigateToRestaurant(restaurantId, search = '') {
+  if (!restaurantId) return;
+  window.location.assign(`/restaurants/${encodeURIComponent(restaurantId)}${search}`);
+}
+
 function handleExpenseDeleteSubmit(event) {
   const form = event.target;
   if (!(form instanceof HTMLFormElement) || !form.action) return;
@@ -28,20 +44,14 @@ function handleExpenseDeleteSubmit(event) {
     body: formData,
   })
     .then((response) => {
-      if (response.redirected) {
-        window.location.href = response.url;
+      if (response.redirected && isSafeInternalUrl(response.url)) {
+        window.location.assign(response.url);
         return;
       }
-      if (response.ok) {
-        window.location.href = `/restaurants/${restaurantId}`;
-        return;
-      }
-      return response.text().then(() => {
-        window.location.href = `/restaurants/${restaurantId}`;
-      });
+      navigateToRestaurant(restaurantId);
     })
     .catch(() => {
-      window.location.href = `/restaurants/${restaurantId}`;
+      navigateToRestaurant(restaurantId);
     })
     .finally(() => {
       const submitButton = form.querySelector('button[type="submit"]');
@@ -67,7 +77,7 @@ export function initRestaurantDetail() {
     editBtn.addEventListener('click', () => {
       const { restaurantId } = editBtn.dataset;
       if (restaurantId) {
-        window.location.href = `/restaurants/${restaurantId}?edit=True`;
+        navigateToRestaurant(restaurantId, '?edit=True');
       }
     });
   }
@@ -78,7 +88,7 @@ export function initRestaurantDetail() {
     cancelEditBtn.addEventListener('click', () => {
       const { restaurantId } = cancelEditBtn.dataset;
       if (restaurantId) {
-        window.location.href = `/restaurants/${restaurantId}`;
+        navigateToRestaurant(restaurantId);
       }
     });
   }

@@ -1456,6 +1456,28 @@
             return (selectedOption.dataset.displayName || selectedOption.textContent || "").trim();
         }
 
+        function createComparisonNode(className, text) {
+            const node = document.createElement("div");
+            node.className = className;
+            node.textContent = text;
+            return node;
+        }
+
+        function replaceRestaurantMatchFields(container, fields) {
+            container.replaceChildren(
+                ...fields.flatMap(function (field) {
+                    const hasValue = Boolean(field.value && field.value.trim());
+                    return [
+                        createComparisonNode("import-review-compare-label", field.label),
+                        createComparisonNode(
+                            "import-review-compare-value " + (hasValue ? "match" : "unchanged"),
+                            hasValue ? field.value : "(None)"
+                        ),
+                    ];
+                })
+            );
+        }
+
         function renderRestaurantMatch(rowNumber) {
             const elements = getRowElements(rowNumber);
             if (!elements.restaurantMatchFields) {
@@ -1464,8 +1486,12 @@
 
             const selectedOption = getSelectedRestaurantOption(elements);
             if (!selectedOption || !selectedOption.value) {
-                elements.restaurantMatchFields.innerHTML =
-                    '<div class="small text-muted">Select a restaurant to preview its existing details here.</div>';
+                elements.restaurantMatchFields.replaceChildren(
+                    createComparisonNode(
+                        "small text-muted",
+                        "Select a restaurant to preview its existing details here."
+                    )
+                );
                 return;
             }
 
@@ -1478,20 +1504,7 @@
                 { label: "Postal code", value: selectedOption.dataset.postalCode || "" },
             ];
 
-            elements.restaurantMatchFields.innerHTML = fields
-                .map(function (field) {
-                    const hasValue = Boolean(field.value && field.value.trim());
-                    return (
-                        '<div class="import-review-compare-label">' +
-                        field.label +
-                        '</div><div class="import-review-compare-value ' +
-                        (hasValue ? "match" : "unchanged") +
-                        '">' +
-                        (hasValue ? field.value : "(None)") +
-                        "</div>"
-                    );
-                })
-                .join("");
+            replaceRestaurantMatchFields(elements.restaurantMatchFields, fields);
         }
 
         function getDuplicateCandidatesForSelection(rowNumber, restaurantId) {

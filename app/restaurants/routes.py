@@ -113,6 +113,13 @@ def _is_safe_redirect_path(url: str | None) -> bool:
     return bool(parsed.path and not parsed.netloc)
 
 
+def _get_safe_redirect_path(url: str | None) -> str | None:
+    """Return a sanitized internal redirect path or None."""
+    if not _is_safe_redirect_path(url):
+        return None
+    return str(url).strip()
+
+
 def _get_selected_merchant_for_form(form: RestaurantForm, restaurant: Restaurant | None = None) -> Merchant | None:
     """Resolve the merchant currently associated with the form."""
     if restaurant and restaurant.merchant:
@@ -1212,9 +1219,9 @@ def edit_restaurant(restaurant_id: int) -> str | Response:
         try:
             # Update restaurant with form data
             services.update_restaurant(restaurant.id, current_user.id, form)
-            next_url = request.form.get("next") or request.args.get("next")
-            if next_url and _is_safe_redirect_path(next_url):
-                return redirect(next_url)  # type: ignore[return-value]
+            safe_next_url = _get_safe_redirect_path(request.form.get("next") or request.args.get("next"))
+            if safe_next_url:
+                return redirect(safe_next_url)  # type: ignore[return-value]
             # Redirect without flash message - success feedback handled by destination page
             return redirect(url_for("restaurants.restaurant_details", restaurant_id=restaurant.id))  # type: ignore[return-value]
         except (
@@ -1249,7 +1256,7 @@ def edit_restaurant(restaurant_id: int) -> str | Response:
         merchant_service_levels=merchant_services.get_merchant_service_levels(),
         merchant_cuisine_choices=get_cuisine_choices(),
         merchant_format_labels=merchant_services.MERCHANT_FORMAT_CATEGORY_LABELS,
-        return_url=request.args.get("next", "").strip() if _is_safe_redirect_path(request.args.get("next")) else "",
+        return_url=_get_safe_redirect_path(request.args.get("next")) or "",
     )
 
 

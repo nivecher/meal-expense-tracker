@@ -8,6 +8,7 @@ from werkzeug.datastructures import FileStorage
 
 from app.extensions import db
 from app.merchants.models import Merchant
+from app.restaurants import routes as restaurant_routes
 from app.restaurants.models import Restaurant
 
 
@@ -254,6 +255,37 @@ def test_edit_restaurant_preserves_safe_next_url_in_form(client, auth, test_rest
     assert response.status_code == 200
     assert f'href="{next_url}"'.encode() in response.data
     assert f'<input type="hidden" name="next" value="{next_url}">'.encode() in response.data
+
+
+def test_edit_restaurant_drops_unsafe_next_url_from_form(client, auth, test_restaurant, test_user) -> None:
+    """Edit form should not preserve an external return URL."""
+    auth.login("testuser_1", "testpass")
+
+    response = client.get(
+        url_for("restaurants.edit_restaurant", restaurant_id=test_restaurant.id, next="https://evil.example/return")
+    )
+
+    assert response.status_code == 200
+    assert b"https://evil.example/return" not in response.data
+
+
+def test_edit_restaurant_ignores_unsafe_next_redirect(client, auth, monkeypatch, test_restaurant, test_user) -> None:
+    """Restaurant edit should ignore an external next redirect."""
+    auth.login("testuser_1", "testpass")
+
+    monkeypatch.setattr(restaurant_routes.RestaurantForm, "validate_on_submit", lambda self: True)
+    monkeypatch.setattr(restaurant_routes.services, "update_restaurant", lambda *args, **kwargs: None)
+
+    response = client.post(
+        url_for("restaurants.edit_restaurant", restaurant_id=test_restaurant.id),
+        data={
+            "next": "https://evil.example/return",
+        },
+    )
+
+    assert response.status_code == 302
+    assert response.headers["Location"].endswith(f"/restaurants/{test_restaurant.id}")
+    assert "evil.example" not in response.headers["Location"]
 
 
 def test_restaurant_form_normalizes_us_phone_number(app) -> None:
