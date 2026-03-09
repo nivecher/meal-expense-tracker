@@ -94,6 +94,7 @@ Resources:
                   - kms:CreateKey
                   - kms:CreateAlias
                   - kms:DeleteAlias
+                  - kms:UpdateAlias
                   - kms:DescribeKey
                   - kms:Describe*
                   - kms:EnableKeyRotation
@@ -151,6 +152,7 @@ Resources:
                   - logs:CreateLogGroup
                   - logs:DeleteLogGroup
                   - logs:DescribeLogGroups
+                  - logs:AssociateKmsKey
                   - logs:CreateLogDelivery
                   - logs:GetLogDelivery
                   - logs:UpdateLogDelivery
